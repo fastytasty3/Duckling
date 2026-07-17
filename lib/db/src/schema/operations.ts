@@ -1,9 +1,10 @@
-import { pgTable, serial, text, integer, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, index, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const operationsTable = pgTable("operations", {
   id: serial("id").primaryKey(),
+  uuid: text("uuid"), // for offline sync deduplication (unique enforced in app)
   productId: integer("product_id"),
   operatorId: integer("operator_id"),
   shiftId: integer("shift_id"),
@@ -15,6 +16,8 @@ export const operationsTable = pgTable("operations", {
   operatorName: text("operator_name"),
   shiftName: text("shift_name"),
   workplaceName: text("workplace_name"),
+  operatorDepartment: text("operator_department"),
+  operatorTabNumber: text("operator_tab_number"),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
   endTime: timestamp("end_time", { withTimezone: true }),
   status: text("status").notNull().default("active"), // active | paused | stopped | completed
@@ -24,6 +27,11 @@ export const operationsTable = pgTable("operations", {
   pauseDurationSeconds: integer("pause_duration_seconds").default(0),
   normTimeSeconds: integer("norm_time_seconds"),
   comment: text("comment"),
+  supervisorComment: text("supervisor_comment"),
+  isFlagged: boolean("is_flagged").notNull().default(false),
+  flagReason: text("flag_reason"),
+  completedBySupervisor: boolean("completed_by_supervisor").notNull().default(false),
+  timeManuallyEdited: boolean("time_manually_edited").notNull().default(false),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

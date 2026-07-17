@@ -6,3 +6,6 @@ export * from "./operations";
 export * from "./operation_pauses";
 export * from "./settings";
 export * from "./action_log";
+export * from "./supervisor_accounts";
+export * from "./security_log";
+export * from "./supervisor_sessions";

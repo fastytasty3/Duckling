@@ -1,0 +1,1 @@
+- [Supervisor auth system](supervisor-auth.md) — bcrypt+JWT auth, first-run wizard, 5-attempt lockout, 7-sheet Excel export, WebSocket workstation monitoring.

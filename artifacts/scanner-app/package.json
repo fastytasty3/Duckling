@@ -73,5 +73,9 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "@types/uuid": "^11.0.0",
+    "uuid": "^14.0.1"
   }
 }
