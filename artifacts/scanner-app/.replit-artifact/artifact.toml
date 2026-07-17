@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Счётчик времени обработки товаров"
+version = "1.0.0"
+id = "artifacts/scanner-app"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22485
+
+[services.development]
+run = "pnpm --filter @workspace/scanner-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/scanner-app", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/scanner-app/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22485"
+BASE_PATH = "/"

@@ -3,20 +3,36 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API specification for Barcode Scanner Time Tracker
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: operators
+    description: Operator management
+  - name: shifts
+    description: Shift management
+  - name: workplaces
+    description: Workplace management
+  - name: products
+    description: Product catalog
+  - name: operations
+    description: Time tracking operations
+  - name: settings
+    description: Application settings
+  - name: reports
+    description: Reports and analytics
+  - name: action-log
+    description: Action log
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +40,818 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Operators
+  /operators:
+    get:
+      operationId: listOperators
+      tags: [operators]
+      summary: List all operators
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of operators
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Operator"
+    post:
+      operationId: createOperator
+      tags: [operators]
+      summary: Create operator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperatorInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operator"
+
+  /operators/{id}:
+    get:
+      operationId: getOperator
+      tags: [operators]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Operator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operator"
+    patch:
+      operationId: updateOperator
+      tags: [operators]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperatorUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operator"
+    delete:
+      operationId: deleteOperator
+      tags: [operators]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  # Shifts
+  /shifts:
+    get:
+      operationId: listShifts
+      tags: [shifts]
+      responses:
+        "200":
+          description: List of shifts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Shift"
+    post:
+      operationId: createShift
+      tags: [shifts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShiftInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+
+  /shifts/{id}:
+    patch:
+      operationId: updateShift
+      tags: [shifts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShiftUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+    delete:
+      operationId: deleteShift
+      tags: [shifts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  # Workplaces
+  /workplaces:
+    get:
+      operationId: listWorkplaces
+      tags: [workplaces]
+      responses:
+        "200":
+          description: List of workplaces
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Workplace"
+    post:
+      operationId: createWorkplace
+      tags: [workplaces]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkplaceInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workplace"
+
+  /workplaces/{id}:
+    patch:
+      operationId: updateWorkplace
+      tags: [workplaces]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkplaceUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workplace"
+    delete:
+      operationId: deleteWorkplace
+      tags: [workplaces]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  # Products
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      parameters:
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [products]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/barcode/{barcode}:
+    get:
+      operationId: getProductByBarcode
+      tags: [products]
+      parameters:
+        - name: barcode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    patch:
+      operationId: updateProduct
+      tags: [products]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  /products/import:
+    post:
+      operationId: importProducts
+      tags: [products]
+      summary: Import products from CSV data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductImport"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  # Operations
+  /operations:
+    get:
+      operationId: listOperations
+      tags: [operations]
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: operatorId
+          in: query
+          schema:
+            type: integer
+        - name: shiftId
+          in: query
+          schema:
+            type: integer
+        - name: workplaceId
+          in: query
+          schema:
+            type: integer
+        - name: barcode
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of operations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationList"
+
+  /operations/active:
+    get:
+      operationId: getActiveOperation
+      tags: [operations]
+      summary: Get currently active operation
+      responses:
+        "200":
+          description: Active operation or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveOperationResponse"
+
+  /operations/scan:
+    post:
+      operationId: processBarcodeScan
+      tags: [operations]
+      summary: Process a barcode scan - main action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanInput"
+      responses:
+        "200":
+          description: Scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResult"
+
+  /operations/{id}:
+    get:
+      operationId: getOperation
+      tags: [operations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+    patch:
+      operationId: updateOperation
+      tags: [operations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+    delete:
+      operationId: deleteOperation
+      tags: [operations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  /operations/{id}/stop:
+    post:
+      operationId: stopOperation
+      tags: [operations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+
+  /operations/{id}/pause:
+    post:
+      operationId: pauseOperation
+      tags: [operations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+
+  /operations/{id}/resume:
+    post:
+      operationId: resumeOperation
+      tags: [operations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+
+  /operations/{id}/quantity:
+    patch:
+      operationId: updateOperationQuantity
+      tags: [operations]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuantityUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+
+  # Settings
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  # Session (current operator/shift selection)
+  /session:
+    get:
+      operationId: getSession
+      tags: [operators]
+      summary: Get current session (operator, shift, workplace)
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+    post:
+      operationId: setSession
+      tags: [operators]
+      summary: Set current session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "200":
+          description: Session set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  # Reports
+  /reports/summary:
+    get:
+      operationId: getReportSummary
+      tags: [reports]
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: operatorId
+          in: query
+          schema:
+            type: integer
+        - name: shiftId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSummary"
+
+  /reports/by-product:
+    get:
+      operationId: getReportByProduct
+      tags: [reports]
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: operatorId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Stats by product
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductStats"
+
+  /reports/by-hour:
+    get:
+      operationId: getReportByHour
+      tags: [reports]
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: operatorId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Stats by hour
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HourStats"
+
+  /reports/by-operator:
+    get:
+      operationId: getReportByOperator
+      tags: [reports]
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stats by operator
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OperatorStats"
+
+  # Action log
+  /action-log:
+    get:
+      operationId: listActionLog
+      tags: [action-log]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Action log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActionLogEntry"
+
+  # Export
+  /export/operations:
+    get:
+      operationId: exportOperations
+      tags: [reports]
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+      responses:
+        "200":
+          description: Export data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportData"
+
+  /export/products:
+    get:
+      operationId: exportProducts
+      tags: [reports]
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+      responses:
+        "200":
+          description: Export data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportData"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +862,652 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Operator:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        tabNumber:
+          type: ["string", "null"]
+        department:
+          type: ["string", "null"]
+        workplace:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - active
+        - createdAt
+
+    OperatorInput:
+      type: object
+      properties:
+        name:
+          type: string
+        tabNumber:
+          type: string
+        department:
+          type: string
+        workplace:
+          type: string
+        active:
+          type: boolean
+      required:
+        - name
+
+    OperatorUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        tabNumber:
+          type: string
+        department:
+          type: string
+        workplace:
+          type: string
+        active:
+          type: boolean
+
+    Shift:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        timeStart:
+          type: ["string", "null"]
+        timeEnd:
+          type: ["string", "null"]
+        active:
+          type: boolean
+      required:
+        - id
+        - name
+        - active
+
+    ShiftInput:
+      type: object
+      properties:
+        name:
+          type: string
+        timeStart:
+          type: string
+        timeEnd:
+          type: string
+        active:
+          type: boolean
+      required:
+        - name
+
+    ShiftUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        timeStart:
+          type: string
+        timeEnd:
+          type: string
+        active:
+          type: boolean
+
+    Workplace:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        active:
+          type: boolean
+      required:
+        - id
+        - name
+        - active
+
+    WorkplaceInput:
+      type: object
+      properties:
+        name:
+          type: string
+        active:
+          type: boolean
+      required:
+        - name
+
+    WorkplaceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        active:
+          type: boolean
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        barcode:
+          type: string
+        sku:
+          type: ["string", "null"]
+        name:
+          type: string
+        category:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+        normTimeSeconds:
+          type: ["integer", "null"]
+        comment:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - barcode
+        - name
+        - active
+        - createdAt
+
+    ProductInput:
+      type: object
+      properties:
+        barcode:
+          type: string
+        sku:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        unit:
+          type: string
+        normTimeSeconds:
+          type: integer
+        comment:
+          type: string
+        active:
+          type: boolean
+      required:
+        - barcode
+        - name
+
+    ProductUpdate:
+      type: object
+      properties:
+        barcode:
+          type: string
+        sku:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        unit:
+          type: string
+        normTimeSeconds:
+          type: integer
+        comment:
+          type: string
+        active:
+          type: boolean
+
+    ProductImport:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              barcode:
+                type: string
+              sku:
+                type: string
+              name:
+                type: string
+              category:
+                type: string
+              normTimeSeconds:
+                type: integer
+            required:
+              - barcode
+              - name
+      required:
+        - rows
+
+    ImportResult:
+      type: object
+      properties:
+        created:
+          type: integer
+        updated:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+      required:
+        - created
+        - updated
+        - skipped
+        - errors
+
+    Operation:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: ["integer", "null"]
+        operatorId:
+          type: ["integer", "null"]
+        shiftId:
+          type: ["integer", "null"]
+        workplaceId:
+          type: ["integer", "null"]
+        barcode:
+          type: string
+        productName:
+          type: ["string", "null"]
+        productSku:
+          type: ["string", "null"]
+        productCategory:
+          type: ["string", "null"]
+        operatorName:
+          type: ["string", "null"]
+        shiftName:
+          type: ["string", "null"]
+        workplaceName:
+          type: ["string", "null"]
+        startTime:
+          type: string
+        endTime:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, paused, stopped, completed]
+        quantity:
+          type: integer
+        netDurationSeconds:
+          type: ["integer", "null"]
+        totalDurationSeconds:
+          type: ["integer", "null"]
+        pauseDurationSeconds:
+          type: ["integer", "null"]
+        normTimeSeconds:
+          type: ["integer", "null"]
+        comment:
+          type: ["string", "null"]
+        pauses:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationPause"
+        createdAt:
+          type: string
+      required:
+        - id
+        - barcode
+        - startTime
+        - status
+        - quantity
+        - createdAt
+
+    OperationUpdate:
+      type: object
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        startTime:
+          type: string
+        endTime:
+          type: string
+        comment:
+          type: string
+
+    QuantityUpdate:
+      type: object
+      properties:
+        quantity:
+          type: integer
+        delta:
+          type: integer
+      required: []
+
+    OperationPause:
+      type: object
+      properties:
+        id:
+          type: integer
+        operationId:
+          type: integer
+        startTime:
+          type: string
+        endTime:
+          type: ["string", "null"]
+      required:
+        - id
+        - operationId
+        - startTime
+
+    OperationList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Operation"
+        total:
+          type: integer
+      required:
+        - items
+        - total
+
+    ActiveOperationResponse:
+      type: object
+      properties:
+        operation:
+          oneOf:
+            - $ref: "#/components/schemas/Operation"
+            - type: "null"
+      required:
+        - operation
+
+    ScanInput:
+      type: object
+      properties:
+        barcode:
+          type: string
+        operatorId:
+          type: integer
+        shiftId:
+          type: integer
+        workplaceId:
+          type: integer
+      required:
+        - barcode
+
+    ScanResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [new_operation, quantity_incremented, operation_restarted, product_unknown]
+        operation:
+          $ref: "#/components/schemas/Operation"
+        previousOperation:
+          oneOf:
+            - $ref: "#/components/schemas/Operation"
+            - type: "null"
+        productFound:
+          type: boolean
+      required:
+        - status
+        - operation
+        - productFound
+
+    Session:
+      type: object
+      properties:
+        operatorId:
+          type: ["integer", "null"]
+        shiftId:
+          type: ["integer", "null"]
+        workplaceId:
+          type: ["integer", "null"]
+        operatorName:
+          type: ["string", "null"]
+        shiftName:
+          type: ["string", "null"]
+        workplaceName:
+          type: ["string", "null"]
+      required: []
+
+    SessionInput:
+      type: object
+      properties:
+        operatorId:
+          type: integer
+        shiftId:
+          type: integer
+        workplaceId:
+          type: integer
+      required:
+        - operatorId
+        - shiftId
+
+    Settings:
+      type: object
+      properties:
+        scanMode:
+          type: string
+          enum: [new_operation, increment_quantity]
+        minBarcodeLength:
+          type: integer
+        duplicateScanDebounceMs:
+          type: integer
+        soundEnabled:
+          type: boolean
+        darkMode:
+          type: boolean
+        autoStopMinutes:
+          type: ["integer", "null"]
+        warningMinutes:
+          type: ["integer", "null"]
+        defaultNormTimeSeconds:
+          type: ["integer", "null"]
+        exportPath:
+          type: ["string", "null"]
+        backupEnabled:
+          type: boolean
+        startWithWindows:
+          type: boolean
+      required:
+        - scanMode
+        - minBarcodeLength
+        - duplicateScanDebounceMs
+        - soundEnabled
+        - darkMode
+        - backupEnabled
+        - startWithWindows
+
+    SettingsUpdate:
+      type: object
+      properties:
+        scanMode:
+          type: string
+          enum: [new_operation, increment_quantity]
+        minBarcodeLength:
+          type: integer
+        duplicateScanDebounceMs:
+          type: integer
+        soundEnabled:
+          type: boolean
+        darkMode:
+          type: boolean
+        autoStopMinutes:
+          type: integer
+        warningMinutes:
+          type: integer
+        defaultNormTimeSeconds:
+          type: integer
+        exportPath:
+          type: string
+        backupEnabled:
+          type: boolean
+        startWithWindows:
+          type: boolean
+
+    ReportSummary:
+      type: object
+      properties:
+        totalOperations:
+          type: integer
+        totalUnits:
+          type: integer
+        totalNetSeconds:
+          type: integer
+        totalPauseSeconds:
+          type: integer
+        avgOperationSeconds:
+          type: integer
+        avgSecondsPerUnit:
+          type: integer
+        aboveNormCount:
+          type: integer
+        belowNormCount:
+          type: integer
+        fastestProduct:
+          type: ["string", "null"]
+        slowestProduct:
+          type: ["string", "null"]
+        activeOperation:
+          oneOf:
+            - $ref: "#/components/schemas/Operation"
+            - type: "null"
+      required:
+        - totalOperations
+        - totalUnits
+        - totalNetSeconds
+        - totalPauseSeconds
+        - avgOperationSeconds
+        - avgSecondsPerUnit
+        - aboveNormCount
+        - belowNormCount
+
+    ProductStats:
+      type: object
+      properties:
+        productId:
+          type: ["integer", "null"]
+        barcode:
+          type: string
+        sku:
+          type: ["string", "null"]
+        name:
+          type: string
+        operationCount:
+          type: integer
+        totalUnits:
+          type: integer
+        totalNetSeconds:
+          type: integer
+        avgOperationSeconds:
+          type: integer
+        avgSecondsPerUnit:
+          type: integer
+        minSeconds:
+          type: integer
+        maxSeconds:
+          type: integer
+        normTimeSeconds:
+          type: ["integer", "null"]
+        deviationSeconds:
+          type: ["integer", "null"]
+      required:
+        - barcode
+        - name
+        - operationCount
+        - totalUnits
+        - totalNetSeconds
+        - avgOperationSeconds
+        - avgSecondsPerUnit
+        - minSeconds
+        - maxSeconds
+
+    HourStats:
+      type: object
+      properties:
+        hour:
+          type: integer
+        operationCount:
+          type: integer
+        totalUnits:
+          type: integer
+        avgSeconds:
+          type: integer
+      required:
+        - hour
+        - operationCount
+        - totalUnits
+        - avgSeconds
+
+    OperatorStats:
+      type: object
+      properties:
+        operatorId:
+          type: ["integer", "null"]
+        operatorName:
+          type: string
+        operationCount:
+          type: integer
+        totalUnits:
+          type: integer
+        totalNetSeconds:
+          type: integer
+        avgOperationSeconds:
+          type: integer
+      required:
+        - operatorName
+        - operationCount
+        - totalUnits
+        - totalNetSeconds
+        - avgOperationSeconds
+
+    ActionLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        timestamp:
+          type: string
+        userId:
+          type: ["integer", "null"]
+        userName:
+          type: ["string", "null"]
+        action:
+          type: string
+        details:
+          type: ["string", "null"]
+      required:
+        - id
+        - timestamp
+        - action
+
+    ExportData:
+      type: object
+      properties:
+        filename:
+          type: string
+        mimeType:
+          type: string
+        data:
+          type: string
+      required:
+        - filename
+        - mimeType
+        - data
