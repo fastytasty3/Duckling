@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   useGetSession, 
   useGetActiveOperation, 
@@ -51,6 +51,145 @@ export default function Home() {
     activeOp?.status, 
     activeOp?.pauses
   );
+
+  // ── WebSocket: register this browser tab as a workstation ──────────────────
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const workplaceId = session?.workplaceId;
+    if (!workplaceId) return;
+
+    let closed = false;
+    let pingTimer: ReturnType<typeof setInterval>;
+
+    function connect() {
+      if (closed) return;
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(
+        `${proto}//${location.host}/api/ws?type=workstation&workplaceId=${workplaceId}`
+      );
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        sendState(ws);
+        pingTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN)
+            ws.send(JSON.stringify({ type: "ping" }));
+        }, 15_000);
+      };
+      ws.onclose = () => {
+        clearInterval(pingTimer);
+        if (!closed) setTimeout(connect, 3000);
+      };
+      ws.onerror = () => ws.close();
+    }
+
+    function sendState(ws: WebSocket) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !session) return;
+
+      // Derive status from active operation
+      let status: string = "ready";
+      if (activeOp) {
+        if (activeOp.status === "active") status = "working";
+        else if (activeOp.status === "paused") status = "paused";
+      }
+
+      // Total pause seconds for current op
+      const pauseSec = activeOp?.pauses
+        ? (activeOp.pauses as Array<{ startTime: string; endTime: string | null }>).reduce((acc, p) => {
+            if (!p.endTime) return acc;
+            return acc + Math.floor((new Date(p.endTime).getTime() - new Date(p.startTime).getTime()) / 1000);
+          }, 0)
+        : 0;
+
+      ws.send(
+        JSON.stringify({
+          type: "state_update",
+          data: {
+            workplaceId: session.workplaceId,
+            workplaceName: session.workplaceName ?? `Рабочее место ${session.workplaceId}`,
+            operatorId: session.operatorId ?? null,
+            operatorName: session.operatorName ?? null,
+            operatorTabNumber: null,
+            shiftId: session.shiftId ?? null,
+            shiftName: session.shiftName ?? null,
+            loginTime: null,
+            status,
+            currentBarcode: activeOp?.barcode ?? null,
+            currentSku: activeOp?.productSku ?? null,
+            currentProductName: activeOp?.productName ?? null,
+            currentQuantity: activeOp?.quantity ?? 0,
+            operationStartTime: activeOp?.startTime ?? null,
+            operationDurationSeconds: timerSeconds,
+            pauseDurationSeconds: pauseSec,
+            lastScanTime: activeOp?.startTime ?? null,
+            shiftUnitsTotal: 0,
+            shiftOperationsTotal: 0,
+            avgSecondsPerUnit: 0,
+            lastHeartbeat: new Date().toISOString(),
+          },
+        })
+      );
+    }
+
+    connect();
+
+    return () => {
+      closed = true;
+      clearInterval(pingTimer);
+      wsRef.current?.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.workplaceId]);
+
+  // Send updated state to WS whenever operation changes
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !session?.workplaceId) return;
+
+    let status: string = "ready";
+    if (activeOp) {
+      if (activeOp.status === "active") status = "working";
+      else if (activeOp.status === "paused") status = "paused";
+    }
+
+    const pauseSec = activeOp?.pauses
+      ? (activeOp.pauses as Array<{ startTime: string; endTime: string | null }>).reduce((acc, p) => {
+          if (!p.endTime) return acc;
+          return acc + Math.floor((new Date(p.endTime).getTime() - new Date(p.startTime).getTime()) / 1000);
+        }, 0)
+      : 0;
+
+    ws.send(
+      JSON.stringify({
+        type: "state_update",
+        data: {
+          workplaceId: session.workplaceId,
+          workplaceName: session.workplaceName ?? `Рабочее место ${session.workplaceId}`,
+          operatorId: session.operatorId ?? null,
+          operatorName: session.operatorName ?? null,
+          operatorTabNumber: null,
+          shiftId: session.shiftId ?? null,
+          shiftName: session.shiftName ?? null,
+          loginTime: null,
+          status,
+          currentBarcode: activeOp?.barcode ?? null,
+          currentSku: activeOp?.productSku ?? null,
+          currentProductName: activeOp?.productName ?? null,
+          currentQuantity: activeOp?.quantity ?? 0,
+          operationStartTime: activeOp?.startTime ?? null,
+          operationDurationSeconds: timerSeconds,
+          pauseDurationSeconds: pauseSec,
+          lastScanTime: activeOp?.startTime ?? null,
+          shiftUnitsTotal: 0,
+          shiftOperationsTotal: 0,
+          avgSecondsPerUnit: 0,
+          lastHeartbeat: new Date().toISOString(),
+        },
+      })
+    );
+  }, [activeOp, timerSeconds, session]);
+  // ── end WebSocket ────────────────────────────────────────────────────────────
 
   const [manualBarcode, setManualBarcode] = useState("");
   const processScan = useProcessBarcodeScan();

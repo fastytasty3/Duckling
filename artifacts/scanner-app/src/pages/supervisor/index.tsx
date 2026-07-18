@@ -121,7 +121,8 @@ function WorkstationsTab({ token }: { token: string | null }) {
     if (!token) return;
     const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${proto}//${location.host}${base}/ws?type=supervisor&token=${encodeURIComponent(token)}`;
+    // WS lives on the API server at /api/ws, not on the frontend path
+    const url = `${proto}//${location.host}/api/ws?type=supervisor&token=${encodeURIComponent(token)}`;
 
     const ws = new WebSocket(url);
     wsRef.current = ws;
@@ -151,10 +152,21 @@ function WorkstationsTab({ token }: { token: string | null }) {
   }, [token]);
 
   useEffect(() => {
-    // Also fetch HTTP snapshot
+    // Initial HTTP snapshot
     supervisorApi.workstations().then(setWorkstations).catch(() => {});
     connect();
-    return () => wsRef.current?.close();
+
+    // Polling fallback: if WS is down, re-fetch via HTTP every 5 s
+    const poll = setInterval(() => {
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        supervisorApi.workstations().then(setWorkstations).catch(() => {});
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(poll);
+      wsRef.current?.close();
+    };
   }, [connect]);
 
   const sorted = [...workstations].sort((a, b) => a.workplaceId - b.workplaceId);
