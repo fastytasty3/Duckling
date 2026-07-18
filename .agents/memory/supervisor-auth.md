@@ -1,26 +1,39 @@
 ---
-name: Supervisor auth system
-description: bcrypt+JWT supervisor auth, first-run wizard, lockout, Excel export, WebSocket monitoring
+name: Supervisor auth system & zone architecture
+description: Auth, zone-based access control, operator session flow, and real-time workstation monitoring for the barcode scanner app.
 ---
 
-## What was built
-- New DB tables: `supervisor_accounts`, `security_log`, `supervisor_sessions`
-- Auth routes at `/api/auth/*`: login, logout, me, setup, change-password, reset-password, accounts CRUD
-- Supervisor routes at `/api/supervisor/*`: workstations, history, flagged, security-log, force-stop, comment
-- Excel export at `/api/supervisor/export/excel` (7 sheets, ExcelJS)
-- WebSocket server at `/ws?type=supervisor&token=...` for real-time workstation status
-- Frontend: login page at `/supervisor/login`, supervisor panel at `/supervisor`, auth context
+## Auth
+- bcrypt + JWT in httpOnly cookie (`sv_token`), sessions in `supervisor_sessions` table
+- `validateSession` reads `account.department` and returns it as `AuthPayload.department`
+- 5-attempt lockout, first-run admin wizard
+- `ensureSchema()` on API startup creates missing tables/enums idempotently using `sql.raw()`
 
-## Key decisions
-- JWT stored in httpOnly cookie AND returned as body.token (for WS use)
-- SessionStorage used on frontend (not localStorage) for session token — cleared on tab close unless rememberMe
-- Lockout: 5 failed attempts → `temp_locked` + `lockedUntil` timestamp in DB; 5-minute lockout
-- Generic error message: always "Неверный логин или пароль" — never reveals which field is wrong
-- WebSocket path `/ws` is attached to the same HTTP server as Express
-- Workstation state is in-memory Map on server — refreshed by ws messages from operator tabs
-- Excel: ExcelJS library, 7 sheets, frozen headers, auto-filter, duration format `[ч]:мм:сс`
+## Zone-based access (ОКиУ)
+- `workplacesTable` has a `zone` column (text, nullable) — added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+- `supervisorAccountsTable.department` stores the supervisor's zone (e.g., "ОКиУ 3")
+- `/supervisor/workstations` filters by `sv.department` when `sv.role === "supervisor"`; admins see all
+- Zone values for operators are fixed strings: "ОКиУ 2" through "ОКиУ 6"
 
-**Why:**
-- Security: no info leakage on login failure, bcrypt(12), httpOnly cookie
-- Real-time: WebSocket preferred over polling for workstation status
-- Passwords never logged (security log explicitly excludes them)
+**Why:** Zone isolation so supervisor of ОКиУ 3 only sees their workstations.
+
+**How to apply:** When creating workplaces, set `zone = "ОКиУ X"`. When creating supervisor accounts, set `department = "ОКиУ X"` (must match exactly).
+
+## Operator session flow (new)
+- Session modal shows when `session?.workplaceId` is null (NOT operatorId)
+- Operator selects ОКиУ (2–6) → workplace list filters by `wp.zone === selectedOkiu`
+- `POST /session` accepts `{ workplaceId, zone }` — operatorId and shiftId are optional
+- `DELETE /session` clears the in-memory session (operator logout)
+- Session store (`session-store.ts`) has `clearSession()` function
+
+## Home page tabs
+- "Сканирование" — barcode scanning (existing)
+- "Количество людей" — people counter (1–20) + FIO input per person, state is in-memory React state
+
+## Workstation monitoring
+- `/supervisor/workstations` is DB-driven (not WS-only); WS supplements if available
+- WS URL fix: operators connect to `/api/ws` (not `/ws`)
+- Operators send `state_update` via WS on every operation change + 15s ping
+
+## Excel export
+- 7-sheet export via `exceljs`

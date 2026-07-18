@@ -19,4 +19,6 @@ export interface Session {
   shiftName?: string | null;
   /** @nullable */
   workplaceName?: string | null;
+  /** @nullable */
+  zone?: string | null;
 }

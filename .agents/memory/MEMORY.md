@@ -1,1 +1,1 @@
-- [Supervisor auth system](supervisor-auth.md) — bcrypt+JWT auth, first-run wizard, 5-attempt lockout, 7-sheet Excel export, WebSocket workstation monitoring.
+- [Supervisor auth system & zone architecture](supervisor-auth.md) — bcrypt+JWT auth, ОКиУ zone filtering, operator session flow (workplaceId only), DELETE /session logout, people-count tab.

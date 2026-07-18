@@ -8,6 +8,7 @@ interface SessionData {
   operatorName: string | null;
   shiftName: string | null;
   workplaceName: string | null;
+  zone: string | null;
 }
 
 let session: SessionData = {
@@ -17,6 +18,7 @@ let session: SessionData = {
   operatorName: null,
   shiftName: null,
   workplaceName: null,
+  zone: null,
 };
 
 export function getSession(): SessionData {
@@ -25,4 +27,16 @@ export function getSession(): SessionData {
 
 export function setSession(data: SessionData): void {
   session = { ...data };
+}
+
+export function clearSession(): void {
+  session = {
+    operatorId: null,
+    shiftId: null,
+    workplaceId: null,
+    operatorName: null,
+    shiftName: null,
+    workplaceName: null,
+    zone: null,
+  };
 }

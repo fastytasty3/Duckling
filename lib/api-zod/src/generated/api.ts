@@ -798,9 +798,10 @@ export const GetSessionResponse = zod.object({
  * @summary Set current session
  */
 export const SetSessionBody = zod.object({
-  "operatorId": zod.number(),
-  "shiftId": zod.number(),
-  "workplaceId": zod.number().optional()
+  "operatorId": zod.number().optional(),
+  "shiftId": zod.number().optional(),
+  "workplaceId": zod.number().optional(),
+  "zone": zod.string().optional()
 })
 
 export const SetSessionResponse = zod.object({
@@ -809,7 +810,8 @@ export const SetSessionResponse = zod.object({
   "workplaceId": zod.number().nullish(),
   "operatorName": zod.string().nullish(),
   "shiftName": zod.string().nullish(),
-  "workplaceName": zod.string().nullish()
+  "workplaceName": zod.string().nullish(),
+  "zone": zod.string().nullish()
 })
 
 
