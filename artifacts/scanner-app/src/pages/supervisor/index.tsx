@@ -5,15 +5,16 @@ import { supervisorApi, type WorkstationState, authApi } from "@/lib/api";
 import { formatDuration } from "@/lib/date-utils";
 import {
   Monitor, LogOut, Shield, BarChart2, History, Settings, AlertTriangle,
-  RefreshCw, Download, Users, Clock, Package, Wifi, WifiOff, Lock
+  RefreshCw, Download, Users, Clock, Package, Wifi, WifiOff, Lock, LayoutGrid
 } from "lucide-react";
 import SupervisorHistory from "./history";
 import SupervisorReports from "./reports";
 import SupervisorSecurity from "./security";
 import SupervisorAccounts from "./accounts";
+import SupervisorWorkplaces from "./workplaces";
 import ChangePassword from "./change-password";
 
-type Tab = "workstations" | "history" | "reports" | "security" | "accounts" | "change-password";
+type Tab = "workstations" | "history" | "reports" | "security" | "accounts" | "workplaces" | "change-password";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   unauthorized:  { label: "Не авторизован",        color: "text-zinc-400",   bg: "bg-zinc-800",    border: "border-zinc-700" },
@@ -210,12 +211,13 @@ export default function SupervisorPanel() {
   if (!supervisor) return null;
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
-    { id: "workstations",     label: "Рабочие столы",  icon: <Monitor className="w-4 h-4" /> },
-    { id: "history",          label: "История",         icon: <History className="w-4 h-4" /> },
-    { id: "reports",          label: "Отчёты",          icon: <BarChart2 className="w-4 h-4" /> },
+    { id: "workstations",     label: "Рабочие столы",      icon: <Monitor className="w-4 h-4" /> },
+    { id: "history",          label: "История",             icon: <History className="w-4 h-4" /> },
+    { id: "reports",          label: "Отчёты",              icon: <BarChart2 className="w-4 h-4" /> },
     { id: "security",         label: "Журнал безопасности", icon: <Lock className="w-4 h-4" /> },
-    { id: "accounts",         label: "Учётные записи",  icon: <Users className="w-4 h-4" />, adminOnly: true },
-    { id: "change-password",  label: "Сменить пароль",  icon: <Settings className="w-4 h-4" /> },
+    { id: "accounts",         label: "Учётные записи",      icon: <Users className="w-4 h-4" />, adminOnly: true },
+    { id: "workplaces",       label: "Рабочие места",       icon: <LayoutGrid className="w-4 h-4" />, adminOnly: true },
+    { id: "change-password",  label: "Сменить пароль",      icon: <Settings className="w-4 h-4" /> },
   ];
 
   const handleLogout = async () => {
@@ -279,6 +281,7 @@ export default function SupervisorPanel() {
           {tab === "reports"         && <SupervisorReports />}
           {tab === "security"        && <SupervisorSecurity />}
           {tab === "accounts"        && supervisor.role === "admin" && <SupervisorAccounts />}
+          {tab === "workplaces"      && supervisor.role === "admin" && <SupervisorWorkplaces />}
           {tab === "change-password" && <ChangePassword onDone={() => setLocation("/supervisor/login")} />}
         </div>
       </main>

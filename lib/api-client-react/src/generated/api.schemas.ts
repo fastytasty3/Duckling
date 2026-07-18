@@ -70,16 +70,22 @@ export interface Workplace {
   id: number;
   name: string;
   active: boolean;
+  /** @nullable */
+  zone?: string | null;
 }
 
 export interface WorkplaceInput {
   name: string;
   active?: boolean;
+  /** @nullable */
+  zone?: string | null;
 }
 
 export interface WorkplaceUpdate {
   name?: string;
   active?: boolean;
+  /** @nullable */
+  zone?: string | null;
 }
 
 export interface Product {
@@ -260,12 +266,15 @@ export interface Session {
   shiftName?: string | null;
   /** @nullable */
   workplaceName?: string | null;
+  /** @nullable */
+  zone?: string | null;
 }
 
 export interface SessionInput {
-  operatorId: number;
-  shiftId: number;
+  operatorId?: number;
+  shiftId?: number;
   workplaceId?: number;
+  zone?: string;
 }
 
 export type SettingsScanMode = typeof SettingsScanMode[keyof typeof SettingsScanMode];
