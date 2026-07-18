@@ -9,5 +9,6 @@
 export interface Workplace {
   id: number;
   name: string;
+  zone?: string | null;
   active: boolean;
 }

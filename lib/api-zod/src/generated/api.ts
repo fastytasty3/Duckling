@@ -165,12 +165,14 @@ export const ListWorkplacesResponse = zod.array(ListWorkplacesResponseItem)
 
 export const CreateWorkplaceBody = zod.object({
   "name": zod.string(),
+  "zone": zod.string().nullish(),
   "active": zod.boolean().optional()
 })
 
 export const CreateWorkplaceResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
+  "zone": zod.string().nullish(),
   "active": zod.boolean()
 })
 
@@ -181,12 +183,14 @@ export const UpdateWorkplaceParams = zod.object({
 
 export const UpdateWorkplaceBody = zod.object({
   "name": zod.string().optional(),
+  "zone": zod.string().nullish(),
   "active": zod.boolean().optional()
 })
 
 export const UpdateWorkplaceResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
+  "zone": zod.string().nullish(),
   "active": zod.boolean()
 })
 

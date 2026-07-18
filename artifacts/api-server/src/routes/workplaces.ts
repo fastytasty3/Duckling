@@ -11,7 +11,7 @@ import {
 const router: IRouter = Router();
 
 const toDto = (r: typeof workplacesTable.$inferSelect) => ({
-  id: r.id, name: r.name, active: r.active,
+  id: r.id, name: r.name, zone: r.zone ?? null, active: r.active,
 });
 
 router.get("/workplaces", async (_req, res): Promise<void> => {
@@ -24,6 +24,7 @@ router.post("/workplaces", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const [row] = await db.insert(workplacesTable).values({
     name: parsed.data.name,
+    zone: (parsed.data as any).zone ?? null,
     active: parsed.data.active ?? true,
   }).returning();
   res.status(201).json(toDto(row));
@@ -36,6 +37,7 @@ router.patch("/workplaces/:id", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const updates: Record<string, unknown> = {};
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+  if ((parsed.data as any).zone !== undefined) updates.zone = (parsed.data as any).zone;
   if (parsed.data.active !== undefined) updates.active = parsed.data.active;
   const [row] = await db.update(workplacesTable).set(updates).where(eq(workplacesTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Workplace not found" }); return; }

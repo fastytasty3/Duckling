@@ -8,5 +8,6 @@
 
 export interface WorkplaceInput {
   name: string;
+  zone?: string | null;
   active?: boolean;
 }

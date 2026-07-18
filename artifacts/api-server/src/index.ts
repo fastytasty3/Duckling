@@ -82,6 +82,9 @@ async function ensureSchema() {
       )
     `));
 
+    // 3. Add zone column to workplaces if missing (idempotent)
+    await db.execute(sql.raw(`ALTER TABLE workplaces ADD COLUMN IF NOT EXISTS zone TEXT`));
+
     logger.info("Schema check complete");
   } catch (err) {
     logger.error({ err }, "Schema migration failed — continuing anyway");

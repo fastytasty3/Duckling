@@ -59,7 +59,7 @@ export default function SupervisorAccounts() {
         <form onSubmit={handleCreate} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 grid grid-cols-2 gap-3">
           {[
             { label: "ФИО *", key: "fullName", placeholder: "Иванов Иван Иванович" },
-            { label: "Подразделение", key: "department", placeholder: "Отдел контроля" },
+            { label: "Зона (для контролёра)", key: "department", placeholder: "Зона 1" },
             { label: "Логин *", key: "login", placeholder: "Уникальный логин" },
             { label: "Пароль *", key: "password", placeholder: "Минимум 8 символов" },
           ].map(f => (
@@ -91,7 +91,7 @@ export default function SupervisorAccounts() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-zinc-800">
-              {["ФИО","Логин","Роль","Подразделение","Статус","Последний вход","Действия"].map(h =>
+              {["ФИО","Логин","Роль","Зона","Статус","Последний вход","Действия"].map(h =>
                 <th key={h} className="text-left text-zinc-500 font-medium px-3 py-2 text-xs">{h}</th>)}
             </tr></thead>
             <tbody>

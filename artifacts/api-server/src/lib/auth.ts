@@ -13,6 +13,7 @@ export interface AuthPayload {
   supervisorId: number;
   login: string;
   role: string;
+  department?: string | null;
   sessionToken: string;
 }
 
@@ -108,7 +109,7 @@ export async function validateSession(token: string): Promise<AuthPayload | null
     const [account] = await db.select().from(supervisorAccountsTable)
       .where(eq(supervisorAccountsTable.id, payload.supervisorId));
     if (!account || !account.active || account.status === "admin_locked") return null;
-    return { supervisorId: payload.supervisorId, login: payload.login, role: payload.role, sessionToken: token };
+    return { supervisorId: payload.supervisorId, login: payload.login, role: payload.role, department: account.department, sessionToken: token };
   } catch {
     return null;
   }

@@ -8,5 +8,6 @@
 
 export interface WorkplaceUpdate {
   name?: string;
+  zone?: string | null;
   active?: boolean;
 }

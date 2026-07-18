@@ -12,11 +12,15 @@ const router: IRouter = Router();
 const auth = requireAuth(["supervisor", "admin"]);
 
 // Real-time workstation status — DB-driven, WS data supplements
-router.get("/supervisor/workstations", auth, async (_req, res): Promise<void> => {
+router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => {
+  const sv = (req as any).supervisor;
+  // Zone filter: supervisors only see their zone; admins see all
+  const zoneFilter: string | null = (sv.role === "supervisor" && sv.department) ? sv.department : null;
+
   // WS map (populated when operators connect via WebSocket)
   const wsMap = new Map(getWorkstations().map(w => [w.workplaceId, w]));
 
-  // All active workplaces
+  // Active workplaces (optionally filtered by zone)
   const workplaces = await db.select().from(workplacesTable).where(eq(workplacesTable.active, true));
 
   // Active / paused operations per workplace (most recent per workplace)
@@ -53,6 +57,9 @@ router.get("/supervisor/workstations", auth, async (_req, res): Promise<void> =>
   const result = [];
 
   for (const wp of workplaces) {
+    // Zone isolation: skip workplaces that don't belong to this supervisor's zone
+    if (zoneFilter && wp.zone !== zoneFilter) continue;
+
     const ws = wsMap.get(wp.id);
     const op = opByWorkplace.get(wp.id);
 

@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const workplacesTable = pgTable("workplaces", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  zone: text("zone"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
