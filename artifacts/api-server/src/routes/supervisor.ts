@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
-import { db, operationsTable, operationPausesTable, securityLogTable } from "@workspace/db";
+import { and, desc, eq, gte, isNull, lte, or, ne } from "drizzle-orm";
+import { db, operationsTable, operationPausesTable, securityLogTable, workplacesTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import { logSecurity } from "../lib/auth";
 import { getWorkstations } from "../lib/ws-server";
@@ -11,9 +11,99 @@ const router: IRouter = Router();
 // All routes require supervisor or admin role
 const auth = requireAuth(["supervisor", "admin"]);
 
-// Real-time workstation status
+// Real-time workstation status — DB-driven, WS data supplements
 router.get("/supervisor/workstations", auth, async (_req, res): Promise<void> => {
-  res.json(getWorkstations());
+  // WS map (populated when operators connect via WebSocket)
+  const wsMap = new Map(getWorkstations().map(w => [w.workplaceId, w]));
+
+  // All active workplaces
+  const workplaces = await db.select().from(workplacesTable).where(eq(workplacesTable.active, true));
+
+  // Active / paused operations per workplace (most recent per workplace)
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const activeOps = await db.select().from(operationsTable)
+    .where(and(
+      isNull(operationsTable.deletedAt),
+      or(eq(operationsTable.status, "active"), eq(operationsTable.status, "paused")),
+      gte(operationsTable.startTime, startOfDay),
+    ))
+    .orderBy(desc(operationsTable.startTime));
+
+  // Today's completed ops per workplace for shift totals
+  const todayOps = await db.select().from(operationsTable)
+    .where(and(
+      isNull(operationsTable.deletedAt),
+      ne(operationsTable.status, "active"),
+      ne(operationsTable.status, "paused"),
+      gte(operationsTable.startTime, startOfDay),
+    ));
+
+  // Keep only the first (most recent) active op per workplace
+  const opByWorkplace = new Map<number, typeof operationsTable.$inferSelect>();
+  for (const op of activeOps) {
+    if (op.workplaceId && !opByWorkplace.has(op.workplaceId)) {
+      opByWorkplace.set(op.workplaceId, op);
+    }
+  }
+
+  // Build workstation states
+  const now = Date.now();
+  const result = [];
+
+  for (const wp of workplaces) {
+    const ws = wsMap.get(wp.id);
+    const op = opByWorkplace.get(wp.id);
+
+    if (!op && !ws) continue; // workplace idle and no WS connection — skip
+
+    // Shift stats for this workplace
+    const shiftOps = todayOps.filter(o => o.workplaceId === wp.id);
+    const shiftOpsTotal = shiftOps.length + (op ? 1 : 0);
+    const shiftUnitsTotal = shiftOps.reduce((acc, o) => acc + (o.quantity ?? 0), 0) + (op?.quantity ?? 0);
+    const avgDurations = shiftOps.filter(o => o.netDurationSeconds && o.quantity).map(o => o.netDurationSeconds! / o.quantity!);
+    const avgSecondsPerUnit = avgDurations.length ? Math.round(avgDurations.reduce((a, b) => a + b, 0) / avgDurations.length) : 0;
+
+    if (ws) {
+      // WS data is most up-to-date — use it, but supplement shift stats from DB
+      result.push({ ...ws, shiftOperationsTotal: shiftOpsTotal, shiftUnitsTotal, avgSecondsPerUnit });
+      continue;
+    }
+
+    // DB-derived state (no WS connection)
+    if (!op) continue;
+
+    const elapsedSec = Math.floor((now - new Date(op.startTime).getTime()) / 1000);
+    const pauseSec = op.pauseDurationSeconds ?? 0;
+    const netSec = Math.max(0, elapsedSec - pauseSec);
+
+    result.push({
+      workplaceId: wp.id,
+      workplaceName: op.workplaceName ?? wp.name,
+      operatorId: op.operatorId,
+      operatorName: op.operatorName,
+      operatorTabNumber: op.operatorTabNumber,
+      shiftId: op.shiftId,
+      shiftName: op.shiftName,
+      loginTime: op.startTime.toISOString(),
+      status: op.status === "paused" ? "paused" : "working",
+      currentBarcode: op.barcode,
+      currentSku: op.productSku,
+      currentProductName: op.productName,
+      currentQuantity: op.quantity,
+      operationStartTime: op.startTime.toISOString(),
+      operationDurationSeconds: netSec,
+      pauseDurationSeconds: pauseSec,
+      lastScanTime: op.startTime.toISOString(),
+      shiftUnitsTotal,
+      shiftOperationsTotal: shiftOpsTotal,
+      avgSecondsPerUnit,
+      lastHeartbeat: new Date().toISOString(),
+    });
+  }
+
+  res.json(result);
 });
 
 // Force-stop a stuck operation (supervisor action)
