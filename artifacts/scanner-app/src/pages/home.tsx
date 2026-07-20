@@ -132,6 +132,8 @@ export default function Home() {
           shiftOperationsTotal: 0,
           avgSecondsPerUnit: 0,
           lastHeartbeat: new Date().toISOString(),
+          peopleCount,
+          peopleNames: peopleNames.filter(Boolean),
         },
       }));
     }
@@ -188,9 +190,11 @@ export default function Home() {
         shiftOperationsTotal: 0,
         avgSecondsPerUnit: 0,
         lastHeartbeat: new Date().toISOString(),
+        peopleCount,
+        peopleNames: peopleNames.filter(Boolean),
       },
     }));
-  }, [activeOp, timerSeconds, session]);
+  }, [activeOp, timerSeconds, session, peopleCount, peopleNames]);
   // ── end WebSocket ────────────────────────────────────────────────────────────
 
   const [manualBarcode, setManualBarcode] = useState("");

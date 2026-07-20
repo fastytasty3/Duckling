@@ -5,7 +5,8 @@ import { supervisorApi, type WorkstationState, authApi } from "@/lib/api";
 import { formatDuration } from "@/lib/date-utils";
 import {
   Monitor, LogOut, Shield, BarChart2, History, Settings, AlertTriangle,
-  RefreshCw, Download, Users, Clock, Package, Wifi, WifiOff, Lock, LayoutGrid
+  RefreshCw, Download, Users, Clock, Package, Wifi, WifiOff, Lock, LayoutGrid,
+  ScanBarcode, Sun, Moon, UserCheck
 } from "lucide-react";
 import SupervisorHistory from "./history";
 import SupervisorReports from "./reports";
@@ -36,6 +37,16 @@ function WorkstationCard({ ws, token }: { ws: WorkstationState; token: string | 
   const lastBeat = ws.lastHeartbeat ? new Date(ws.lastHeartbeat) : null;
   const isStale = lastBeat ? (Date.now() - lastBeat.getTime()) > 30000 : true;
 
+  const hasPeople = ws.peopleNames && ws.peopleNames.length > 0;
+  const hasBarcode = ws.currentBarcode || ws.currentSku;
+
+  // Determine shift icon
+  const shiftIcon = ws.shiftName?.toLowerCase().includes("ноч")
+    ? <Moon className="w-3 h-3 text-indigo-400" />
+    : ws.shiftName
+    ? <Sun className="w-3 h-3 text-amber-400" />
+    : null;
+
   return (
     <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-4 flex flex-col gap-3 relative`}>
       {/* Header */}
@@ -55,44 +66,93 @@ function WorkstationCard({ ws, token }: { ws: WorkstationState; token: string | 
         </div>
       </div>
 
-      {/* Operator info */}
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <div className="text-zinc-500 uppercase tracking-wider text-[10px]">Оператор</div>
-          <div className="text-zinc-200 font-medium truncate">{ws.operatorName ?? "—"}</div>
-          {ws.operatorTabNumber && <div className="text-zinc-500">№{ws.operatorTabNumber}</div>}
+      {/* Shift + login time */}
+      {(ws.shiftName || ws.loginTime) && (
+        <div className="flex items-center gap-2 text-xs bg-black/20 rounded-lg px-3 py-2">
+          {shiftIcon}
+          <span className="text-zinc-300 font-medium">{ws.shiftName ?? "—"}</span>
+          {ws.loginTime && (
+            <span className="text-zinc-500 ml-auto">
+              с {new Date(ws.loginTime).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
         </div>
-        <div>
-          <div className="text-zinc-500 uppercase tracking-wider text-[10px]">Смена</div>
-          <div className="text-zinc-200">{ws.shiftName ?? "—"}</div>
-          {ws.loginTime && <div className="text-zinc-500">Вход: {new Date(ws.loginTime).toLocaleTimeString("ru-RU")}</div>}
-        </div>
-      </div>
+      )}
 
-      {/* Current operation */}
-      {ws.currentProductName && (
+      {/* People at table — FIO list */}
+      {hasPeople ? (
         <div className="bg-black/30 rounded-lg p-3">
-          <div className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Текущий товар</div>
-          <div className="text-white font-medium text-sm truncate">{ws.currentProductName}</div>
-          {ws.currentSku && <div className="text-zinc-400 text-xs">{ws.currentSku}</div>}
-          <div className="text-zinc-500 text-xs font-mono">{ws.currentBarcode}</div>
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex items-center gap-1 text-xs">
-              <Clock className="w-3 h-3 text-amber-400" />
-              <span className="text-amber-300 font-mono">{formatDuration(elapsed)}</span>
+          <div className="flex items-center gap-1.5 mb-2">
+            <UserCheck className="w-3.5 h-3.5 text-green-400" />
+            <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Сотрудники за столом
+              {ws.peopleCount != null && ws.peopleCount > 0 && (
+                <span className="ml-1 text-green-400 font-bold">{ws.peopleCount} чел.</span>
+              )}
+            </span>
+          </div>
+          <div className="space-y-0.5">
+            {ws.peopleNames!.filter(Boolean).map((name, i) => (
+              <div key={i} className="text-zinc-200 text-xs font-medium">
+                <span className="text-zinc-500 font-mono">{i + 1}. </span>{name}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* No people list yet — show operator name fallback */
+        ws.operatorName && (
+          <div className="flex items-center gap-2 text-xs bg-black/20 rounded-lg px-3 py-2">
+            <Users className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="text-zinc-300">{ws.operatorName}</span>
+            {ws.operatorTabNumber && <span className="text-zinc-500 ml-1">№{ws.operatorTabNumber}</span>}
+          </div>
+        )
+      )}
+
+      {/* Current operation — barcode / product */}
+      {hasBarcode && (
+        <div className="bg-black/30 rounded-lg p-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <ScanBarcode className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+              {ws.status === "working" ? "Сканируется" : "Последний штрихкод"}
+            </span>
+          </div>
+          {ws.currentProductName && (
+            <div className="text-white font-medium text-sm truncate mb-1" title={ws.currentProductName}>
+              {ws.currentProductName}
             </div>
-            {ws.currentQuantity > 0 && (
-              <div className="flex items-center gap-1 text-xs">
-                <Package className="w-3 h-3 text-blue-400" />
-                <span className="text-blue-300">{ws.currentQuantity} шт</span>
-              </div>
+          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            {ws.currentSku && (
+              <span className="text-zinc-300 text-xs font-mono bg-zinc-800/60 rounded px-1.5 py-0.5">
+                {ws.currentSku}
+              </span>
             )}
-            {ws.pauseDurationSeconds > 0 && (
-              <div className="text-xs text-yellow-400">
-                Пауза: {formatDuration(ws.pauseDurationSeconds)}
-              </div>
+            {ws.currentBarcode && (
+              <span className="text-zinc-400 text-xs font-mono">{ws.currentBarcode}</span>
             )}
           </div>
+          {(ws.status === "working" || ws.status === "paused") && (
+            <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-1 text-xs">
+                <Clock className="w-3 h-3 text-amber-400" />
+                <span className="text-amber-300 font-mono">{formatDuration(elapsed)}</span>
+              </div>
+              {ws.currentQuantity > 0 && (
+                <div className="flex items-center gap-1 text-xs">
+                  <Package className="w-3 h-3 text-blue-400" />
+                  <span className="text-blue-300">{ws.currentQuantity} шт</span>
+                </div>
+              )}
+              {ws.pauseDurationSeconds > 0 && (
+                <span className="text-xs text-yellow-400">
+                  Пауза: {formatDuration(ws.pauseDurationSeconds)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 

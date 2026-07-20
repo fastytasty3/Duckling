@@ -70,6 +70,9 @@ export interface WorkstationState {
   avgSecondsPerUnit: number;
   loginTime: string | null;
   lastHeartbeat: string;
+  /** People at the workstation (from "Количество людей" tab) */
+  peopleCount?: number;
+  peopleNames?: string[];
 }
 
 export interface SecurityLogEntry {
