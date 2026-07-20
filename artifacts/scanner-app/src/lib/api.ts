@@ -3,9 +3,13 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 export const API = `${BASE}/api`;
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
+  // Always send sv_token from tab-isolated sessionStorage as Bearer header.
+  // This ensures tab B's login doesn't affect tab A (cookie is shared, sessionStorage is not).
+  const svToken = sessionStorage.getItem("sv_token");
+  const authHeader: Record<string, string> = svToken ? { "Authorization": `Bearer ${svToken}` } : {};
   const res = await fetch(`${API}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...authHeader, ...(opts?.headers ?? {}) },
     ...opts,
   });
   if (!res.ok) {

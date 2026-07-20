@@ -117,7 +117,9 @@ export async function validateSession(token: string): Promise<AuthPayload | null
 
 export function requireAuth(roles?: string[]) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const token = req.cookies?.["sv_token"] ?? req.headers["authorization"]?.replace("Bearer ", "");
+    // Authorization header takes priority over cookie so per-tab sessionStorage tokens work correctly
+    // (cookie is shared across browser tabs; Bearer header comes from tab-isolated sessionStorage)
+    const token = req.headers["authorization"]?.replace("Bearer ", "") ?? req.cookies?.["sv_token"];
     if (!token) {
       res.status(401).json({ error: "Требуется авторизация" });
       return;
