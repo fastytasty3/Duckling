@@ -244,4 +244,21 @@ router.patch("/auth/accounts/:id/status", requireAuth(["admin"]), async (req, re
   res.json({ ok: true });
 });
 
+// TEMPORARY: one-time emergency password reset — will be removed after use
+router.post("/auth/emergency-reset", async (req, res): Promise<void> => {
+  const { token } = req.body ?? {};
+  if (token !== "6f71ffb8b3c3d909329e49ea2ed20c3fe940fd53f7181fdf") {
+    res.status(403).json({ error: "forbidden" }); return;
+  }
+  const hash = await hashPassword("Frolov2026!");
+  await db.update(supervisorAccountsTable).set({
+    passwordHash: hash,
+    mustChangePassword: true,
+    failedAttempts: 0,
+    lockedUntil: null,
+    status: "must_change_password",
+  }).where(eq(supervisorAccountsTable.id, 4));
+  res.json({ ok: true, login: "Фролов КА", tempPassword: "Frolov2026!" });
+});
+
 export default router;
