@@ -17,6 +17,16 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _workplaceIdGetter: (() => string | null) | null = null;
+
+/**
+ * Register a getter that returns the current workplaceId string.
+ * When set, every request automatically gets an `X-Workplace-Id` header
+ * so the server can isolate operator sessions per workstation.
+ */
+export function setWorkplaceIdGetter(getter: (() => string | null) | null): void {
+  _workplaceIdGetter = getter;
+}
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -356,6 +366,12 @@ export async function customFetch<T = unknown>(
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
+  }
+
+  // Attach X-Workplace-Id for operator session isolation
+  if (_workplaceIdGetter && !headers.has("x-workplace-id")) {
+    const wpId = _workplaceIdGetter();
+    if (wpId) headers.set("x-workplace-id", wpId);
   }
 
   const requestInfo = { method, url: resolveUrl(input) };

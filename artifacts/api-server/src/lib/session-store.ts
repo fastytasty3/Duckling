@@ -1,7 +1,8 @@
-// Simple in-memory session store for current operator/shift/workplace
-// In a real desktop Electron app this would persist to SQLite settings
+// Per-workplace in-memory session store.
+// Each physical workstation is identified by its workplaceId.
+// Multiple workplaces can be active simultaneously on the same server.
 
-interface SessionData {
+export interface SessionData {
   operatorId: number | null;
   shiftId: number | null;
   workplaceId: number | null;
@@ -12,7 +13,7 @@ interface SessionData {
   shift: "day" | "night" | null;
 }
 
-let session: SessionData = {
+const EMPTY: SessionData = {
   operatorId: null,
   shiftId: null,
   workplaceId: null,
@@ -23,23 +24,24 @@ let session: SessionData = {
   shift: null,
 };
 
-export function getSession(): SessionData {
-  return { ...session };
+// Map keyed by workplaceId
+const sessions = new Map<number, SessionData>();
+
+export function getSession(workplaceId: number): SessionData {
+  return sessions.has(workplaceId) ? { ...sessions.get(workplaceId)! } : { ...EMPTY, workplaceId };
 }
 
-export function setSession(data: SessionData): void {
-  session = { ...data };
+export function setSession(workplaceId: number, data: SessionData): void {
+  sessions.set(workplaceId, { ...data });
 }
 
-export function clearSession(): void {
-  session = {
-    operatorId: null,
-    shiftId: null,
-    workplaceId: null,
-    operatorName: null,
-    shiftName: null,
-    workplaceName: null,
-    zone: null,
-    shift: null,
-  };
+export function clearSession(workplaceId: number): void {
+  sessions.delete(workplaceId);
+}
+
+/** @deprecated Use getSession(workplaceId) instead */
+export function getSessionLegacy(): SessionData {
+  // Return first active session for legacy callers (should be removed)
+  const first = sessions.values().next().value;
+  return first ? { ...first } : { ...EMPTY };
 }

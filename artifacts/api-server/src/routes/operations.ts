@@ -23,6 +23,7 @@ import {
 } from "../lib/operation-helper";
 import { getSettingsMap, parseSettings } from "../lib/settings-helper";
 import { getSession } from "../lib/session-store";
+// Note: getSession now requires workplaceId — see resolvedWorkplaceId usage below
 import { logAction } from "../lib/action-logger";
 
 const router: IRouter = Router();
@@ -70,8 +71,14 @@ router.get("/operations", async (req, res): Promise<void> => {
   res.json({ items, total: allRows.length });
 });
 
-router.get("/operations/active", async (_req, res): Promise<void> => {
-  const active = await findActiveOperation();
+router.get("/operations/active", async (req, res): Promise<void> => {
+  // Isolate by workplaceId so multiple workstations don't interfere
+  const headerWpId = req.headers["x-workplace-id"];
+  const queryWpId = (req.query as any)?.workplaceId;
+  const rawId = headerWpId ?? queryWpId;
+  const workplaceId = rawId ? (parseInt(String(rawId), 10) || undefined) : undefined;
+
+  const active = await findActiveOperation(workplaceId);
   if (!active) {
     res.json({ operation: null });
     return;
@@ -84,7 +91,11 @@ router.post("/operations/scan", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const { barcode } = parsed.data;
-  const session = getSession();
+  // Resolve workplaceId: from body > X-Workplace-Id header > session fallback
+  const headerWpId = req.headers["x-workplace-id"];
+  const resolvedWorkplaceId = parsed.data.workplaceId
+    ?? (headerWpId ? parseInt(String(headerWpId), 10) || undefined : undefined);
+  const session = resolvedWorkplaceId ? getSession(resolvedWorkplaceId) : { operatorId: null, operatorName: null, shiftId: null, shiftName: null, workplaceId: null, workplaceName: null, zone: null, shift: null };
   const settingsMap = await getSettingsMap();
   const settings = parseSettings(settingsMap);
 
@@ -97,8 +108,8 @@ router.post("/operations/scan", async (req, res): Promise<void> => {
 
   const productFound = !!product;
 
-  // Find currently active operation
-  const currentActive = await findActiveOperation();
+  // Find currently active operation — scoped to this workplaceId
+  const currentActive = await findActiveOperation(resolvedWorkplaceId);
 
   let resultStatus: "new_operation" | "quantity_incremented" | "operation_restarted" | "product_unknown";
   let previousOperation = null;

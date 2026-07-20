@@ -244,7 +244,12 @@ export default function Home() {
   const handleLogout = async () => {
     if (!confirm("Завершить рабочую сессию и выйти?")) return;
     const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    await fetch(`${base}/api/session`, { method: "DELETE" });
+    const wpId = localStorage.getItem("workplaceId");
+    await fetch(`${base}/api/session`, {
+      method: "DELETE",
+      headers: wpId ? { "X-Workplace-Id": wpId } : {},
+    });
+    localStorage.removeItem("workplaceId");
     queryClient.invalidateQueries({ queryKey: getGetSessionQueryKey() });
   };
 
@@ -259,7 +264,10 @@ export default function Home() {
       const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
       await fetch(`${base}/api/session/attendance`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Workplace-Id": String(session.workplaceId),
+        },
         body: JSON.stringify({
           peopleCount,
           peopleNames: peopleNames.filter(Boolean),

@@ -49,9 +49,16 @@ export function SessionModal() {
 
   const handleSave = () => {
     if (!canSave) return;
+    const wpId = parseInt(workplaceId, 10);
     setSession.mutate(
-      { data: { workplaceId: parseInt(workplaceId, 10), zone: okiu, shift: shift as "day" | "night" } },
-      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetSessionQueryKey() }) }
+      { data: { workplaceId: wpId, zone: okiu, shift: shift as "day" | "night" } },
+      {
+        onSuccess: () => {
+          // Persist workplaceId so every subsequent API request carries X-Workplace-Id
+          localStorage.setItem("workplaceId", String(wpId));
+          queryClient.invalidateQueries({ queryKey: getGetSessionQueryKey() });
+        },
+      }
     );
   };
 

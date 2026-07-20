@@ -1,5 +1,5 @@
 import { db, operationsTable, operationPausesTable } from "@workspace/db";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 export type OperationWithPauses = typeof operationsTable.$inferSelect & {
   pauses: (typeof operationPausesTable.$inferSelect)[];
@@ -64,17 +64,25 @@ export async function getOperationWithPauses(id: number) {
   return { op, pauses };
 }
 
-export async function findActiveOperation() {
+export async function findActiveOperation(workplaceId?: number) {
+  const activeConditions = workplaceId
+    ? and(eq(operationsTable.status, "active"), eq(operationsTable.workplaceId, workplaceId))
+    : eq(operationsTable.status, "active");
+
   const [op] = await db.select().from(operationsTable)
-    .where(eq(operationsTable.status, "active"))
+    .where(activeConditions)
     .limit(1);
   if (op) {
     const pauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, op.id));
     return { op, pauses };
   }
-  // Check paused too
+
+  const pausedConditions = workplaceId
+    ? and(eq(operationsTable.status, "paused"), eq(operationsTable.workplaceId, workplaceId))
+    : eq(operationsTable.status, "paused");
+
   const [paused] = await db.select().from(operationsTable)
-    .where(eq(operationsTable.status, "paused"))
+    .where(pausedConditions)
     .limit(1);
   if (paused) {
     const pauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, paused.id));

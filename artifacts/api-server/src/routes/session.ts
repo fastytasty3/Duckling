@@ -11,8 +11,25 @@ const SHIFT_NAMES: Record<string, string> = {
   night: "Ночная (21:00–09:00)",
 };
 
-router.get("/session", async (_req, res): Promise<void> => {
-  res.json(getSession());
+/** Read the workplaceId for this request.
+ *  Priority: X-Workplace-Id header → ?workplaceId query param → 0 (unknown)
+ */
+function getWorkplaceId(req: any): number {
+  const header = req.headers["x-workplace-id"];
+  if (header) return parseInt(String(header), 10) || 0;
+  const query = req.query?.workplaceId;
+  if (query) return parseInt(String(query), 10) || 0;
+  return 0;
+}
+
+router.get("/session", async (req, res): Promise<void> => {
+  const workplaceId = getWorkplaceId(req);
+  if (!workplaceId) {
+    // No workplaceId provided — return empty session so frontend shows modal
+    res.json({ workplaceId: null, operatorId: null, shiftId: null, operatorName: null, shiftName: null, workplaceName: null, zone: null, shift: null });
+    return;
+  }
+  res.json(getSession(workplaceId));
 });
 
 router.post("/session", async (req, res): Promise<void> => {
@@ -20,23 +37,23 @@ router.post("/session", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { operatorId, shiftId, workplaceId, zone, shift } = parsed.data;
 
+  if (!workplaceId) { res.status(400).json({ error: "workplaceId обязателен" }); return; }
+
   let workplaceName: string | null = null;
-  if (workplaceId) {
-    const [wp] = await db.select().from(workplacesTable).where(eq(workplacesTable.id, workplaceId));
-    if (wp) workplaceName = wp.name;
-  }
+  const [wp] = await db.select().from(workplacesTable).where(eq(workplacesTable.id, workplaceId));
+  if (wp) workplaceName = wp.name;
 
   const session = {
     operatorId: operatorId ?? null,
     shiftId: shiftId ?? null,
-    workplaceId: workplaceId ?? null,
+    workplaceId,
     operatorName: null,
     shiftName: shift ? (SHIFT_NAMES[shift] ?? null) : null,
     workplaceName,
     zone: zone ?? null,
     shift: (shift as "day" | "night" | undefined) ?? null,
   };
-  setSession(session);
+  setSession(workplaceId, session);
   res.json(session);
 });
 
@@ -46,12 +63,12 @@ router.post("/session/attendance", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { peopleCount, peopleNames } = parsed.data;
 
-  const session = getSession();
-  if (!session.workplaceId) { res.status(400).json({ error: "Сессия не активна" }); return; }
+  const workplaceId = getWorkplaceId(req);
+  const session = workplaceId ? getSession(workplaceId) : null;
+  if (!session?.workplaceId) { res.status(400).json({ error: "Сессия не активна" }); return; }
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Upsert: update existing record for this workplace+date+shift, or insert
   const existing = await db.select({ id: attendanceLogsTable.id })
     .from(attendanceLogsTable)
     .where(
@@ -85,9 +102,10 @@ router.post("/session/attendance", async (req, res): Promise<void> => {
   res.json({ ok: true });
 });
 
-// Operator logout — clear session
-router.delete("/session", async (_req, res): Promise<void> => {
-  clearSession();
+// Operator logout — clear this workplace's session
+router.delete("/session", async (req, res): Promise<void> => {
+  const workplaceId = getWorkplaceId(req);
+  if (workplaceId) clearSession(workplaceId);
   res.json({ ok: true });
 });
 
