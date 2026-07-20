@@ -55,6 +55,7 @@ export const authApi = {
 export interface WorkstationState {
   workplaceId: number;
   workplaceName: string;
+  zone?: string | null;
   operatorId: number | null;
   operatorName: string | null;
   operatorTabNumber: string | null;

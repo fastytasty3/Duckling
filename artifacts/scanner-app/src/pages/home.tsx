@@ -47,8 +47,10 @@ export default function Home() {
     },
   });
 
-  const { data: recentOperations } = useListOperations({ limit: 10 }, {
-    query: { queryKey: getListOperationsQueryKey({ limit: 10 }) },
+  const workplaceId = Number(localStorage.getItem("workplaceId")) || undefined;
+  const listOpsParams = { limit: 10, ...(workplaceId ? { workplaceId } : {}) };
+  const { data: recentOperations } = useListOperations(listOpsParams, {
+    query: { queryKey: getListOperationsQueryKey(listOpsParams) },
   });
 
   const activeOp = activeData?.operation;

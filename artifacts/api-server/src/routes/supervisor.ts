@@ -99,6 +99,7 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
       const hasFio = Array.isArray(ws.peopleNames) && (ws.peopleNames as string[]).filter(Boolean).length > 0;
       result.push({
         ...ws,
+        zone: wp.zone,
         shiftOperationsTotal: shiftOpsTotal,
         shiftUnitsTotal,
         avgSecondsPerUnit,
@@ -118,6 +119,7 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
     result.push({
       workplaceId: wp.id,
       workplaceName: op.workplaceName ?? wp.name,
+      zone: wp.zone,
       operatorId: op.operatorId,
       operatorName: op.operatorName,
       operatorTabNumber: op.operatorTabNumber,

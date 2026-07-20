@@ -59,7 +59,14 @@ function WorkstationCard({ ws, token }: { ws: WorkstationState; token: string | 
               ? <WifiOff className="w-3 h-3 text-red-500 ml-1" title="Нет связи" />
               : <Wifi className="w-3 h-3 text-green-500 ml-1" title="Онлайн" />}
           </div>
-          <div className={`text-xs font-medium mt-1 ${cfg.color}`}>{cfg.label}</div>
+          <div className="flex items-center gap-2 mt-1">
+            <div className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</div>
+            {ws.zone && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide bg-zinc-700/60 text-zinc-300 rounded px-1.5 py-0.5">
+                {ws.zone}
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-right text-xs text-zinc-500">
           {lastBeat ? lastBeat.toLocaleTimeString("ru-RU") : "—"}
