@@ -56,6 +56,7 @@ export interface WorkstationState {
   workplaceId: number;
   workplaceName: string;
   zone?: string | null;
+  activeOperationId?: number | null;
   operatorId: number | null;
   operatorName: string | null;
   operatorTabNumber: string | null;

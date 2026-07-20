@@ -80,8 +80,6 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
     const ws = wsMap.get(wp.id);
     const op = opByWorkplace.get(wp.id);
 
-    if (!op && !ws) continue; // workplace idle and no WS connection — skip
-
     // Shift stats for this workplace
     const shiftOps = todayOps.filter(o => o.workplaceId === wp.id);
     const shiftOpsTotal = shiftOps.length + (op ? 1 : 0);
@@ -100,6 +98,7 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
       result.push({
         ...ws,
         zone: wp.zone,
+        activeOperationId: op?.id ?? null,
         shiftOperationsTotal: shiftOpsTotal,
         shiftUnitsTotal,
         avgSecondsPerUnit,
@@ -109,38 +108,69 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
       continue;
     }
 
-    // DB-derived state (no WS connection)
-    if (!op) continue;
+    if (op) {
+      // DB-derived state (no WS connection but active operation)
+      const elapsedSec = Math.floor((now - new Date(op.startTime).getTime()) / 1000);
+      const pauseSec = op.pauseDurationSeconds ?? 0;
+      const netSec = Math.max(0, elapsedSec - pauseSec);
 
-    const elapsedSec = Math.floor((now - new Date(op.startTime).getTime()) / 1000);
-    const pauseSec = op.pauseDurationSeconds ?? 0;
-    const netSec = Math.max(0, elapsedSec - pauseSec);
+      result.push({
+        workplaceId: wp.id,
+        workplaceName: op.workplaceName ?? wp.name,
+        zone: wp.zone,
+        activeOperationId: op.id,
+        operatorId: op.operatorId,
+        operatorName: op.operatorName,
+        operatorTabNumber: op.operatorTabNumber,
+        shiftId: op.shiftId,
+        shiftName: op.shiftName,
+        loginTime: op.startTime.toISOString(),
+        status: op.status === "paused" ? "paused" : "working",
+        currentBarcode: op.barcode,
+        currentSku: op.productSku,
+        currentProductName: op.productName,
+        currentQuantity: op.quantity,
+        operationStartTime: op.startTime.toISOString(),
+        operationDurationSeconds: netSec,
+        pauseDurationSeconds: pauseSec,
+        lastScanTime: op.startTime.toISOString(),
+        shiftUnitsTotal,
+        shiftOperationsTotal: shiftOpsTotal,
+        avgSecondsPerUnit,
+        lastHeartbeat: new Date().toISOString(),
+        peopleNames: attPeopleNames,
+        peopleCount: attPeopleCount,
+      });
+      continue;
+    }
 
+    // Inactive workplace — no WS, no active operation; still show in list
     result.push({
       workplaceId: wp.id,
-      workplaceName: op.workplaceName ?? wp.name,
+      workplaceName: wp.name,
       zone: wp.zone,
-      operatorId: op.operatorId,
-      operatorName: op.operatorName,
-      operatorTabNumber: op.operatorTabNumber,
-      shiftId: op.shiftId,
-      shiftName: op.shiftName,
-      loginTime: op.startTime.toISOString(),
-      status: op.status === "paused" ? "paused" : "working",
-      currentBarcode: op.barcode,
-      currentSku: op.productSku,
-      currentProductName: op.productName,
-      currentQuantity: op.quantity,
-      operationStartTime: op.startTime.toISOString(),
-      operationDurationSeconds: netSec,
-      pauseDurationSeconds: pauseSec,
-      lastScanTime: op.startTime.toISOString(),
+      activeOperationId: null,
+      operatorId: null,
+      operatorName: null,
+      operatorTabNumber: null,
+      shiftId: null,
+      shiftName: null,
+      loginTime: null,
+      status: "unauthorized",
+      currentBarcode: null,
+      currentSku: null,
+      currentProductName: null,
+      currentQuantity: 0,
+      operationStartTime: null,
+      operationDurationSeconds: 0,
+      pauseDurationSeconds: 0,
+      lastScanTime: null,
       shiftUnitsTotal,
       shiftOperationsTotal: shiftOpsTotal,
       avgSecondsPerUnit,
-      lastHeartbeat: new Date().toISOString(),
-      peopleNames: attPeopleNames,
-      peopleCount: attPeopleCount,
+      lastHeartbeat: new Date(0).toISOString(),
+      peopleNames: [],
+      peopleCount: 0,
     });
   }
 

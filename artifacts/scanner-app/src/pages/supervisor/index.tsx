@@ -5,8 +5,8 @@ import { supervisorApi, type WorkstationState, authApi } from "@/lib/api";
 import { formatDuration } from "@/lib/date-utils";
 import {
   Monitor, LogOut, Shield, BarChart2, History, Settings, AlertTriangle,
-  RefreshCw, Download, Users, Clock, Package, Wifi, WifiOff, Lock, LayoutGrid,
-  ScanBarcode, Sun, Moon, UserCheck
+  Users, Clock, Package, Wifi, WifiOff, Lock, LayoutGrid,
+  ScanBarcode, Sun, Moon, UserCheck, XCircle, ChevronDown, ChevronUp
 } from "lucide-react";
 import SupervisorHistory from "./history";
 import SupervisorReports from "./reports";
@@ -17,179 +17,251 @@ import ChangePassword from "./change-password";
 
 type Tab = "workstations" | "history" | "reports" | "security" | "accounts" | "workplaces" | "change-password";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  unauthorized:  { label: "Не авторизован",        color: "text-zinc-400",   bg: "bg-zinc-800",    border: "border-zinc-700" },
-  ready:         { label: "Готов к работе",         color: "text-green-400",  bg: "bg-green-950",   border: "border-green-800" },
-  working:       { label: "Товар в работе",         color: "text-green-300",  bg: "bg-green-950",   border: "border-green-700" },
-  paused:        { label: "Пауза",                  color: "text-yellow-400", bg: "bg-yellow-950",  border: "border-yellow-800" },
-  idle:          { label: "Нет активности",         color: "text-yellow-400", bg: "bg-yellow-950",  border: "border-yellow-800" },
-  overdue:       { label: "Слишком долгая операция",color: "text-red-400",    bg: "bg-red-950",     border: "border-red-800" },
-  connection_error: { label: "Ошибка связи",       color: "text-red-400",    bg: "bg-red-950",     border: "border-red-800" },
-  shift_ended:   { label: "Смена завершена",        color: "text-zinc-400",   bg: "bg-zinc-800",    border: "border-zinc-700" },
+const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string }> = {
+  unauthorized:     { label: "Не активен",              dot: "bg-zinc-600",   text: "text-zinc-500" },
+  ready:            { label: "Готов к работе",           dot: "bg-green-500",  text: "text-green-400" },
+  working:          { label: "Товар в работе",           dot: "bg-green-400 animate-pulse", text: "text-green-300" },
+  paused:           { label: "Пауза",                   dot: "bg-yellow-400", text: "text-yellow-400" },
+  idle:             { label: "Нет активности",          dot: "bg-yellow-500", text: "text-yellow-400" },
+  overdue:          { label: "Слишком долгая операция", dot: "bg-red-500 animate-pulse", text: "text-red-400" },
+  connection_error: { label: "Ошибка связи",            dot: "bg-red-500",    text: "text-red-400" },
+  shift_ended:      { label: "Смена завершена",         dot: "bg-zinc-600",   text: "text-zinc-500" },
 };
 
-function WorkstationCard({ ws, token }: { ws: WorkstationState; token: string | null }) {
+const isActive = (status: string) => ["ready", "working", "paused", "idle", "overdue"].includes(status);
+
+function WorkstationRow({
+  ws,
+  onForceClose,
+  closing,
+  canClose,
+}: {
+  ws: WorkstationState;
+  onForceClose: () => void;
+  closing: boolean;
+  canClose: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
   const cfg = STATUS_CONFIG[ws.status] ?? STATUS_CONFIG.unauthorized;
+  const active = isActive(ws.status);
+
+  const lastBeat = ws.lastHeartbeat ? new Date(ws.lastHeartbeat) : null;
+  const isOnline = lastBeat ? (Date.now() - lastBeat.getTime()) < 30000 : false;
   const elapsed = ws.operationStartTime
     ? Math.floor((Date.now() - new Date(ws.operationStartTime).getTime()) / 1000)
     : 0;
 
-  const lastBeat = ws.lastHeartbeat ? new Date(ws.lastHeartbeat) : null;
-  const isStale = lastBeat ? (Date.now() - lastBeat.getTime()) > 30000 : true;
-
-  const hasPeople = ws.peopleNames && ws.peopleNames.length > 0;
-  const hasBarcode = ws.currentBarcode || ws.currentSku;
-
-  // Determine shift icon
+  const hasPeople = ws.peopleNames && ws.peopleNames.filter(Boolean).length > 0;
   const shiftIcon = ws.shiftName?.toLowerCase().includes("ноч")
-    ? <Moon className="w-3 h-3 text-indigo-400" />
-    : ws.shiftName
-    ? <Sun className="w-3 h-3 text-amber-400" />
-    : null;
+    ? <Moon className="w-3 h-3 text-indigo-400 shrink-0" />
+    : ws.shiftName ? <Sun className="w-3 h-3 text-amber-400 shrink-0" /> : null;
 
   return (
-    <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-4 flex flex-col gap-3 relative`}>
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Monitor className="w-4 h-4 text-zinc-400" />
-            <span className="text-white font-semibold text-sm">{ws.workplaceName}</span>
-            {isStale
-              ? <WifiOff className="w-3 h-3 text-red-500 ml-1" title="Нет связи" />
-              : <Wifi className="w-3 h-3 text-green-500 ml-1" title="Онлайн" />}
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</div>
-            {ws.zone && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide bg-zinc-700/60 text-zinc-300 rounded px-1.5 py-0.5">
-                {ws.zone}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-right text-xs text-zinc-500">
-          {lastBeat ? lastBeat.toLocaleTimeString("ru-RU") : "—"}
-        </div>
-      </div>
+    <div className={`transition-colors ${active ? "hover:bg-zinc-800/40" : "opacity-60"}`}>
+      {/* Main row */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+        onClick={() => active && setExpanded(e => !e)}
+      >
+        {/* Status dot */}
+        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
 
-      {/* Shift + login time */}
-      {(ws.shiftName || ws.loginTime) && (
-        <div className="flex items-center gap-2 text-xs bg-black/20 rounded-lg px-3 py-2">
-          {shiftIcon}
-          <span className="text-zinc-300 font-medium">{ws.shiftName ?? "—"}</span>
-          {ws.loginTime && (
-            <span className="text-zinc-500 ml-auto">
-              с {new Date(ws.loginTime).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+        {/* Workplace name */}
+        <div className="w-36 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <Monitor className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            <span className={`text-sm font-semibold truncate ${active ? "text-white" : "text-zinc-500"}`}>
+              {ws.workplaceName}
             </span>
-          )}
+          </div>
         </div>
-      )}
 
-      {/* People at table — FIO list */}
-      {hasPeople ? (
-        <div className="bg-black/30 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <UserCheck className="w-3.5 h-3.5 text-green-400" />
-            <span className="text-[10px] uppercase tracking-wider text-zinc-400">
-              Сотрудники за столом
+        {/* Status label */}
+        <div className={`w-44 shrink-0 text-xs font-medium ${cfg.text}`}>{cfg.label}</div>
+
+        {/* Operator / people */}
+        <div className="flex-1 min-w-0">
+          {hasPeople ? (
+            <div className="flex items-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5 text-green-400 shrink-0" />
+              <span className="text-xs text-zinc-300 truncate">
+                {ws.peopleNames!.filter(Boolean).join(", ")}
+              </span>
               {ws.peopleCount != null && ws.peopleCount > 0 && (
-                <span className="ml-1 text-green-400 font-bold">{ws.peopleCount} чел.</span>
+                <span className="text-[10px] text-green-400 font-bold shrink-0">{ws.peopleCount} чел.</span>
               )}
-            </span>
-          </div>
-          <div className="space-y-0.5">
-            {ws.peopleNames!.filter(Boolean).map((name, i) => (
-              <div key={i} className="text-zinc-200 text-xs font-medium">
-                <span className="text-zinc-500 font-mono">{i + 1}. </span>{name}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        /* No people list yet — show operator name fallback */
-        ws.operatorName && (
-          <div className="flex items-center gap-2 text-xs bg-black/20 rounded-lg px-3 py-2">
-            <Users className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-zinc-300">{ws.operatorName}</span>
-            {ws.operatorTabNumber && <span className="text-zinc-500 ml-1">№{ws.operatorTabNumber}</span>}
-          </div>
-        )
-      )}
-
-      {/* Current operation — barcode / product */}
-      {hasBarcode && (
-        <div className="bg-black/30 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <ScanBarcode className="w-3.5 h-3.5 text-blue-400" />
-            <span className="text-[10px] uppercase tracking-wider text-zinc-400">
-              {ws.status === "working" ? "Сканируется" : "Последний штрихкод"}
-            </span>
-          </div>
-          {ws.currentProductName && (
-            <div className="text-white font-medium text-sm truncate mb-1" title={ws.currentProductName}>
-              {ws.currentProductName}
             </div>
+          ) : ws.operatorName ? (
+            <div className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <span className="text-xs text-zinc-300 truncate">{ws.operatorName}</span>
+              {ws.operatorTabNumber && (
+                <span className="text-[10px] text-zinc-500 shrink-0">№{ws.operatorTabNumber}</span>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-zinc-600">—</span>
           )}
-          <div className="flex items-center gap-3 flex-wrap">
-            {ws.currentSku && (
-              <span className="text-zinc-300 text-xs font-mono bg-zinc-800/60 rounded px-1.5 py-0.5">
-                {ws.currentSku}
+        </div>
+
+        {/* Current barcode / product */}
+        <div className="w-52 shrink-0 min-w-0">
+          {ws.currentBarcode || ws.currentSku ? (
+            <div className="flex items-center gap-1.5">
+              <ScanBarcode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="text-xs text-zinc-300 truncate" title={ws.currentProductName ?? undefined}>
+                {ws.currentProductName ?? ws.currentBarcode ?? ws.currentSku}
               </span>
-            )}
-            {ws.currentBarcode && (
-              <span className="text-zinc-400 text-xs font-mono">{ws.currentBarcode}</span>
-            )}
-          </div>
-          {(ws.status === "working" || ws.status === "paused") && (
-            <div className="flex items-center gap-3 mt-2">
-              <div className="flex items-center gap-1 text-xs">
-                <Clock className="w-3 h-3 text-amber-400" />
-                <span className="text-amber-300 font-mono">{formatDuration(elapsed)}</span>
-              </div>
-              {ws.currentQuantity > 0 && (
-                <div className="flex items-center gap-1 text-xs">
-                  <Package className="w-3 h-3 text-blue-400" />
-                  <span className="text-blue-300">{ws.currentQuantity} шт</span>
-                </div>
-              )}
-              {ws.pauseDurationSeconds > 0 && (
-                <span className="text-xs text-yellow-400">
-                  Пауза: {formatDuration(ws.pauseDurationSeconds)}
-                </span>
-              )}
+            </div>
+          ) : (
+            <span className="text-xs text-zinc-600">—</span>
+          )}
+        </div>
+
+        {/* Timer + qty */}
+        <div className="w-28 shrink-0 flex items-center gap-2">
+          {(ws.status === "working" || ws.status === "paused") && elapsed > 0 ? (
+            <>
+              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-xs font-mono text-amber-300">{formatDuration(elapsed)}</span>
+            </>
+          ) : (
+            <span className="text-xs text-zinc-600">—</span>
+          )}
+        </div>
+
+        {/* Shift totals */}
+        <div className="w-28 shrink-0 text-right">
+          {ws.shiftOperationsTotal > 0 || ws.shiftUnitsTotal > 0 ? (
+            <span className="text-xs text-zinc-400">
+              <span className="text-zinc-200 font-semibold">{ws.shiftOperationsTotal}</span> оп. ·{" "}
+              <span className="text-zinc-200 font-semibold">{ws.shiftUnitsTotal}</span> ед.
+            </span>
+          ) : (
+            <span className="text-xs text-zinc-600">—</span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="w-28 shrink-0 flex items-center justify-end gap-2">
+          {canClose && ws.activeOperationId && (
+            <button
+              onClick={e => { e.stopPropagation(); onForceClose(); }}
+              disabled={closing}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-950/60 text-red-400 border border-red-800/50 hover:bg-red-900/60 hover:text-red-300 disabled:opacity-40 transition"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              {closing ? "..." : "Закрыть"}
+            </button>
+          )}
+          {active && (
+            <div className="text-zinc-600">
+              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </div>
           )}
         </div>
-      )}
-
-      {/* Shift stats */}
-      <div className="flex items-center gap-4 text-xs text-zinc-400 border-t border-zinc-800 pt-2">
-        <span>За смену: <b className="text-zinc-200">{ws.shiftOperationsTotal}</b> оп.</span>
-        <span><b className="text-zinc-200">{ws.shiftUnitsTotal}</b> ед.</span>
-        {ws.avgSecondsPerUnit > 0 && (
-          <span>Ср: <b className="text-amber-300">{ws.avgSecondsPerUnit}с/ед</b></span>
-        )}
-        {ws.lastScanTime && (
-          <span className="ml-auto text-zinc-600">
-            {new Date(ws.lastScanTime).toLocaleTimeString("ru-RU")}
-          </span>
-        )}
       </div>
+
+      {/* Expanded details */}
+      {expanded && active && (
+        <div className="px-4 pb-4 pt-0 border-t border-zinc-800/60">
+          <div className="ml-[calc(0.625rem+0.75rem)] flex flex-wrap gap-4 mt-3">
+
+            {/* Shift & login time */}
+            {(ws.shiftName || ws.loginTime) && (
+              <div className="flex items-center gap-2 text-xs bg-zinc-900 rounded-lg px-3 py-2">
+                {shiftIcon}
+                <span className="text-zinc-300 font-medium">{ws.shiftName ?? "—"}</span>
+                {ws.loginTime && (
+                  <span className="text-zinc-500 ml-1">
+                    с {new Date(ws.loginTime).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Connectivity */}
+            <div className="flex items-center gap-1.5 text-xs bg-zinc-900 rounded-lg px-3 py-2">
+              {isOnline
+                ? <Wifi className="w-3.5 h-3.5 text-green-500" />
+                : <WifiOff className="w-3.5 h-3.5 text-red-500" />}
+              <span className={isOnline ? "text-zinc-400" : "text-red-400"}>
+                {isOnline ? "Онлайн" : "Нет связи"}
+              </span>
+              {lastBeat && (
+                <span className="text-zinc-600 ml-1">{lastBeat.toLocaleTimeString("ru-RU")}</span>
+              )}
+            </div>
+
+            {/* People list if long */}
+            {hasPeople && ws.peopleNames!.filter(Boolean).length > 1 && (
+              <div className="flex items-start gap-1.5 text-xs bg-zinc-900 rounded-lg px-3 py-2">
+                <UserCheck className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                  {ws.peopleNames!.filter(Boolean).map((name, i) => (
+                    <div key={i} className="text-zinc-200">
+                      <span className="text-zinc-500 font-mono">{i + 1}. </span>{name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Barcode detail */}
+            {(ws.currentBarcode || ws.currentSku) && (
+              <div className="flex items-start gap-1.5 text-xs bg-zinc-900 rounded-lg px-3 py-2">
+                <ScanBarcode className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                <div>
+                  {ws.currentProductName && (
+                    <div className="text-white font-medium mb-0.5">{ws.currentProductName}</div>
+                  )}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {ws.currentSku && (
+                      <span className="font-mono text-zinc-300 bg-zinc-800 rounded px-1.5 py-0.5">{ws.currentSku}</span>
+                    )}
+                    {ws.currentBarcode && (
+                      <span className="font-mono text-zinc-500">{ws.currentBarcode}</span>
+                    )}
+                    {ws.currentQuantity > 0 && (
+                      <span className="flex items-center gap-1 text-blue-300">
+                        <Package className="w-3 h-3 text-blue-400" />{ws.currentQuantity} шт
+                      </span>
+                    )}
+                    {ws.pauseDurationSeconds > 0 && (
+                      <span className="text-yellow-400">Пауза: {formatDuration(ws.pauseDurationSeconds)}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Avg speed */}
+            {ws.avgSecondsPerUnit > 0 && (
+              <div className="flex items-center gap-1.5 text-xs bg-zinc-900 rounded-lg px-3 py-2">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-zinc-400">Среднее: <span className="text-amber-300 font-mono">{ws.avgSecondsPerUnit}с/ед</span></span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function WorkstationsTab({ token }: { token: string | null }) {
+  const { supervisor } = useAuth();
   const [workstations, setWorkstations] = useState<WorkstationState[]>([]);
   const [connected, setConnected] = useState(false);
+  const [closing, setClosing] = useState<number | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+
+  const canClose = supervisor?.role === "admin" || supervisor?.role === "supervisor";
 
   const connect = useCallback(() => {
     if (!token) return;
-    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    // WS lives on the API server at /api/ws, not on the frontend path
     const url = `${proto}//${location.host}/api/ws?type=supervisor&token=${encodeURIComponent(token)}`;
 
     const ws = new WebSocket(url);
@@ -220,11 +292,9 @@ function WorkstationsTab({ token }: { token: string | null }) {
   }, [token]);
 
   useEffect(() => {
-    // Initial HTTP snapshot
     supervisorApi.workstations().then(setWorkstations).catch(() => {});
     connect();
 
-    // Polling fallback: if WS is down, re-fetch via HTTP every 5 s
     const poll = setInterval(() => {
       if (wsRef.current?.readyState !== WebSocket.OPEN) {
         supervisorApi.workstations().then(setWorkstations).catch(() => {});
@@ -237,29 +307,104 @@ function WorkstationsTab({ token }: { token: string | null }) {
     };
   }, [connect]);
 
-  const sorted = [...workstations].sort((a, b) => a.workplaceId - b.workplaceId);
+  const handleForceClose = async (ws: WorkstationState) => {
+    if (!ws.activeOperationId) return;
+    if (!confirm(`Закрыть работу стола «${ws.workplaceName}»?\n\nТекущая операция будет принудительно завершена.`)) return;
+    setClosing(ws.workplaceId);
+    setCloseError(null);
+    try {
+      await supervisorApi.forceStop(ws.activeOperationId, "Закрыто администратором");
+      const data = await supervisorApi.workstations();
+      setWorkstations(data);
+    } catch (e) {
+      setCloseError((e as Error).message);
+    } finally {
+      setClosing(null);
+    }
+  };
+
+  // Sort: by zone name, then by workplaceId within zone
+  const sorted = [...workstations].sort((a, b) => {
+    const za = a.zone ?? "Я"; // push null zones to end
+    const zb = b.zone ?? "Я";
+    if (za !== zb) return za.localeCompare(zb, "ru");
+    return a.workplaceId - b.workplaceId;
+  });
+
+  // Group by zone
+  const zones = [...new Set(sorted.map(ws => ws.zone ?? null))];
+
+  const activeCount = sorted.filter(ws => isActive(ws.status)).length;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      {/* Header bar */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
           <div className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`} />
-          <span className="text-zinc-400 text-sm">{connected ? "Подключено (WebSocket)" : "Переподключение..."}</span>
+          <span className="text-zinc-400 text-sm">{connected ? "Подключено" : "Переподключение..."}</span>
+          <span className="text-zinc-600 text-sm">·</span>
+          <span className="text-zinc-400 text-sm">
+            <span className="text-white font-semibold">{activeCount}</span> активных из{" "}
+            <span className="text-white font-semibold">{sorted.length}</span>
+          </span>
         </div>
-        <div className="text-zinc-500 text-sm">{sorted.length} рабочих столов</div>
+        {closeError && (
+          <div className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded px-3 py-1.5">
+            {closeError}
+          </div>
+        )}
       </div>
+
+      {/* Column header */}
+      {sorted.length > 0 && (
+        <div className="flex items-center gap-3 px-4 pb-2 text-[10px] uppercase tracking-wider text-zinc-600 font-semibold select-none">
+          <div className="w-2.5 shrink-0" />
+          <div className="w-36 shrink-0">Стол</div>
+          <div className="w-44 shrink-0">Статус</div>
+          <div className="flex-1">Сотрудник</div>
+          <div className="w-52 shrink-0">Товар</div>
+          <div className="w-28 shrink-0">Время</div>
+          <div className="w-28 shrink-0 text-right">За смену</div>
+          <div className="w-28 shrink-0" />
+        </div>
+      )}
 
       {sorted.length === 0 ? (
         <div className="text-center py-16 text-zinc-600">
           <Monitor className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>Нет подключённых рабочих столов</p>
-          <p className="text-sm mt-1">Рабочие станции отображаются здесь при подключении</p>
+          <p>Нет рабочих столов</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {sorted.map(ws => (
-            <WorkstationCard key={ws.workplaceId} ws={ws} token={token} />
-          ))}
+        <div className="space-y-6">
+          {zones.map(zone => {
+            const rows = sorted.filter(ws => (ws.zone ?? null) === zone);
+            const zoneActive = rows.filter(ws => isActive(ws.status)).length;
+            return (
+              <div key={zone ?? "__none__"}>
+                {/* Zone header */}
+                <div className="flex items-center gap-3 mb-1 px-1">
+                  <span className="text-sm font-bold text-zinc-200">{zone ?? "Без ОКиУ"}</span>
+                  <span className="text-xs text-zinc-500">
+                    {zoneActive} / {rows.length} активных
+                  </span>
+                  <div className="flex-1 h-px bg-zinc-800" />
+                </div>
+                {/* Rows */}
+                <div className="rounded-xl border border-zinc-800 overflow-hidden divide-y divide-zinc-800/80">
+                  {rows.map(ws => (
+                    <WorkstationRow
+                      key={ws.workplaceId}
+                      ws={ws}
+                      onForceClose={() => handleForceClose(ws)}
+                      closing={closing === ws.workplaceId}
+                      canClose={canClose}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
