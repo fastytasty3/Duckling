@@ -65,24 +65,29 @@ export async function getOperationWithPauses(id: number) {
 }
 
 export async function findActiveOperation(workplaceId?: number) {
-  const activeConditions = workplaceId
-    ? and(eq(operationsTable.status, "active"), eq(operationsTable.workplaceId, workplaceId))
-    : eq(operationsTable.status, "active");
+  // Always require workplaceId — never search globally across all workplaces.
+  // Without it, a scan or status poll on workplace A could accidentally find
+  // and finalize an active operation belonging to workplace B.
+  if (!workplaceId) return null;
 
   const [op] = await db.select().from(operationsTable)
-    .where(activeConditions)
+    .where(and(
+      isNull(operationsTable.deletedAt),
+      eq(operationsTable.status, "active"),
+      eq(operationsTable.workplaceId, workplaceId),
+    ))
     .limit(1);
   if (op) {
     const pauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, op.id));
     return { op, pauses };
   }
 
-  const pausedConditions = workplaceId
-    ? and(eq(operationsTable.status, "paused"), eq(operationsTable.workplaceId, workplaceId))
-    : eq(operationsTable.status, "paused");
-
   const [paused] = await db.select().from(operationsTable)
-    .where(pausedConditions)
+    .where(and(
+      isNull(operationsTable.deletedAt),
+      eq(operationsTable.status, "paused"),
+      eq(operationsTable.workplaceId, workplaceId),
+    ))
     .limit(1);
   if (paused) {
     const pauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, paused.id));
