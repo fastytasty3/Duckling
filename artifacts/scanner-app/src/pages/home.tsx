@@ -47,7 +47,7 @@ export default function Home() {
     },
   });
 
-  const workplaceId = Number(localStorage.getItem("workplaceId")) || undefined;
+  const workplaceId = Number(sessionStorage.getItem("workplaceId")) || undefined;
   const listOpsParams = { limit: 10, ...(workplaceId ? { workplaceId } : {}) };
   const { data: recentOperations } = useListOperations(listOpsParams, {
     query: { queryKey: getListOperationsQueryKey(listOpsParams) },
@@ -246,12 +246,12 @@ export default function Home() {
   const handleLogout = async () => {
     if (!confirm("Завершить рабочую сессию и выйти?")) return;
     const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    const wpId = localStorage.getItem("workplaceId");
+    const wpId = sessionStorage.getItem("workplaceId");
     await fetch(`${base}/api/session`, {
       method: "DELETE",
       headers: wpId ? { "X-Workplace-Id": wpId } : {},
     });
-    localStorage.removeItem("workplaceId");
+    sessionStorage.removeItem("workplaceId");
     queryClient.invalidateQueries({ queryKey: getGetSessionQueryKey() });
   };
 

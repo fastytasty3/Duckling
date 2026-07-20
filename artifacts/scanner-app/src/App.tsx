@@ -7,9 +7,9 @@ import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { Layout } from '@/components/layout';
 import { setWorkplaceIdGetter } from '@workspace/api-client-react';
 
-// Every API request automatically carries the workplaceId from localStorage
+// Every API request automatically carries the workplaceId from sessionStorage (tab-isolated)
 // so the server can isolate operator sessions and operations per workstation.
-setWorkplaceIdGetter(() => localStorage.getItem("workplaceId"));
+setWorkplaceIdGetter(() => sessionStorage.getItem("workplaceId"));
 
 import NotFound from '@/pages/not-found';
 import Home from '@/pages/home';

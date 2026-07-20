@@ -55,7 +55,7 @@ export function SessionModal() {
       {
         onSuccess: () => {
           // Persist workplaceId so every subsequent API request carries X-Workplace-Id
-          localStorage.setItem("workplaceId", String(wpId));
+          sessionStorage.setItem("workplaceId", String(wpId));
           queryClient.invalidateQueries({ queryKey: getGetSessionQueryKey() });
         },
       }
