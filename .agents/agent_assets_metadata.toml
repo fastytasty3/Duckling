@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ku2zg8qk_DswEDvIfB5Ky"
+uri = "file://warehouse-scanner-src.zip"
+type = "unspecified"
+title = "warehouse-scanner-src.zip"
