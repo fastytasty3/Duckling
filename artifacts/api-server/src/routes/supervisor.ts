@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, gte, isNull, lte, or, ne } from "drizzle-orm";
-import { db, operationsTable, operationPausesTable, securityLogTable, workplacesTable } from "@workspace/db";
+import { db, operationsTable, operationPausesTable, securityLogTable, workplacesTable, attendanceLogsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import { logSecurity } from "../lib/auth";
 import { getWorkstations } from "../lib/ws-server";
@@ -52,6 +52,23 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
     }
   }
 
+  // Today's attendance logs — most recent per workplace (for FIO display)
+  const today = new Date().toISOString().slice(0, 10);
+  let attendanceRows: (typeof attendanceLogsTable.$inferSelect)[] = [];
+  try {
+    attendanceRows = await db.select().from(attendanceLogsTable)
+      .where(eq(attendanceLogsTable.logDate, today))
+      .orderBy(desc(attendanceLogsTable.updatedAt));
+  } catch (_) { /* table may not exist on first deploy */ }
+
+  // Keep only the most recent attendance per workplace
+  const attendanceByWorkplace = new Map<number, typeof attendanceLogsTable.$inferSelect>();
+  for (const a of attendanceRows) {
+    if (a.workplaceId && !attendanceByWorkplace.has(a.workplaceId)) {
+      attendanceByWorkplace.set(a.workplaceId, a);
+    }
+  }
+
   // Build workstation states
   const now = Date.now();
   const result = [];
@@ -72,9 +89,22 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
     const avgDurations = shiftOps.filter(o => o.netDurationSeconds && o.quantity).map(o => o.netDurationSeconds! / o.quantity!);
     const avgSecondsPerUnit = avgDurations.length ? Math.round(avgDurations.reduce((a, b) => a + b, 0) / avgDurations.length) : 0;
 
+    // Attendance fallback: use DB data when WS doesn't have FIO
+    const att = attendanceByWorkplace.get(wp.id);
+    const attPeopleNames = att ? (att.peopleNames as string[]).filter(Boolean) : [];
+    const attPeopleCount = att?.peopleCount ?? 0;
+
     if (ws) {
-      // WS data is most up-to-date — use it, but supplement shift stats from DB
-      result.push({ ...ws, shiftOperationsTotal: shiftOpsTotal, shiftUnitsTotal, avgSecondsPerUnit });
+      // WS data is most up-to-date; if it lacks FIO, fill from attendance_logs
+      const hasFio = Array.isArray(ws.peopleNames) && (ws.peopleNames as string[]).filter(Boolean).length > 0;
+      result.push({
+        ...ws,
+        shiftOperationsTotal: shiftOpsTotal,
+        shiftUnitsTotal,
+        avgSecondsPerUnit,
+        peopleNames: hasFio ? ws.peopleNames : attPeopleNames,
+        peopleCount: hasFio ? (ws.peopleCount ?? attPeopleCount) : attPeopleCount,
+      });
       continue;
     }
 
@@ -107,6 +137,8 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
       shiftOperationsTotal: shiftOpsTotal,
       avgSecondsPerUnit,
       lastHeartbeat: new Date().toISOString(),
+      peopleNames: attPeopleNames,
+      peopleCount: attPeopleCount,
     });
   }
 
