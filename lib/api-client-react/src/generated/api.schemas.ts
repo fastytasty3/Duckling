@@ -268,6 +268,8 @@ export interface Session {
   workplaceName?: string | null;
   /** @nullable */
   zone?: string | null;
+  /** @nullable */
+  shift?: 'day' | 'night' | null;
 }
 
 export interface SessionInput {
@@ -275,6 +277,7 @@ export interface SessionInput {
   shiftId?: number;
   workplaceId?: number;
   zone?: string;
+  shift?: 'day' | 'night';
 }
 
 export type SettingsScanMode = typeof SettingsScanMode[keyof typeof SettingsScanMode];

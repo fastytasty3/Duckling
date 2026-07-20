@@ -21,4 +21,6 @@ export interface Session {
   workplaceName?: string | null;
   /** @nullable */
   zone?: string | null;
+  /** @nullable */
+  shift?: 'day' | 'night' | null;
 }

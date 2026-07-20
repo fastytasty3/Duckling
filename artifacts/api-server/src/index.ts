@@ -85,6 +85,22 @@ async function ensureSchema() {
     // 3. Add zone column to workplaces if missing (idempotent)
     await db.execute(sql.raw(`ALTER TABLE workplaces ADD COLUMN IF NOT EXISTS zone TEXT`));
 
+    // 4. Attendance logs table
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS attendance_logs (
+        id             SERIAL PRIMARY KEY,
+        workplace_id   INTEGER,
+        workplace_name TEXT,
+        zone           TEXT,
+        shift_name     TEXT,
+        log_date       DATE NOT NULL DEFAULT CURRENT_DATE,
+        people_count   INTEGER NOT NULL DEFAULT 0,
+        people_names   JSONB NOT NULL DEFAULT '[]',
+        created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `));
+
     logger.info("Schema check complete");
   } catch (err) {
     logger.error({ err }, "Schema migration failed — continuing anyway");

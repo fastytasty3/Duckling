@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
-import { db, operationsTable, operationPausesTable, productsTable, operatorsTable, workplacesTable } from "@workspace/db";
+import { and, desc, eq, gte, isNull, lte, between } from "drizzle-orm";
+import { db, operationsTable, operationPausesTable, workplacesTable, attendanceLogsTable } from "@workspace/db";
 import { requireAuth, logSecurity } from "../lib/auth";
 import ExcelJS from "exceljs";
 
@@ -325,6 +325,33 @@ router.get("/supervisor/export/excel", auth, async (req, res): Promise<void> => 
     row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF0F0" } };
   }
   autoWidth(s7);
+
+  // ── Sheet 8: Явка сотрудников ─────────────────────────────────────
+  const s8 = wb.addWorksheet("Явка сотрудников");
+  s8.addRow(["Дата","Смена","ОКиУ","Рабочий стол","Кол-во","ФИО сотрудников"]);
+  applyHeaderStyle(s8.lastRow!, "2E7D32");
+  s8.views = [{ state: "frozen", ySplit: 1 }];
+
+  let attendanceRows: (typeof attendanceLogsTable.$inferSelect)[] = [];
+  try {
+    const atConds: any[] = [];
+    if (q.dateFrom) atConds.push(gte(attendanceLogsTable.createdAt, new Date(q.dateFrom)));
+    if (q.dateTo) atConds.push(lte(attendanceLogsTable.createdAt, new Date(q.dateTo)));
+    attendanceRows = atConds.length > 0
+      ? await db.select().from(attendanceLogsTable).where(and(...atConds)).orderBy(desc(attendanceLogsTable.logDate))
+      : await db.select().from(attendanceLogsTable).orderBy(desc(attendanceLogsTable.logDate));
+  } catch (_) { /* table may not exist on older deploys */ }
+
+  for (const al of attendanceRows) {
+    const names = Array.isArray(al.peopleNames) ? (al.peopleNames as string[]).filter(Boolean).join(", ") : "";
+    const row = s8.addRow([
+      al.logDate, al.shiftName ?? "", al.zone ?? "",
+      al.workplaceName ?? "", al.peopleCount, names,
+    ]);
+    applyDataRow(row);
+    row.getCell(1).numFmt = "DD.MM.YYYY";
+  }
+  autoWidth(s8);
 
   // ── Generate filename and send ────────────────────────────────────
   const now = new Date();

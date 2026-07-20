@@ -9,6 +9,7 @@ interface SessionData {
   shiftName: string | null;
   workplaceName: string | null;
   zone: string | null;
+  shift: "day" | "night" | null;
 }
 
 let session: SessionData = {
@@ -19,6 +20,7 @@ let session: SessionData = {
   shiftName: null,
   workplaceName: null,
   zone: null,
+  shift: null,
 };
 
 export function getSession(): SessionData {
@@ -38,5 +40,6 @@ export function clearSession(): void {
     shiftName: null,
     workplaceName: null,
     zone: null,
+    shift: null,
   };
 }

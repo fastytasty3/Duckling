@@ -9,3 +9,4 @@ export * from "./action_log";
 export * from "./supervisor_accounts";
 export * from "./security_log";
 export * from "./supervisor_sessions";
+export * from "./attendance_logs";

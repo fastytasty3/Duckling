@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   useGetSession,
   useGetActiveOperation,
@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, Square, Plus, Package, Clock, User, AlertCircle, Calendar, LogOut, Users, Minus } from "lucide-react";
+import { Play, Pause, Square, Plus, Package, Clock, User, AlertCircle, LogOut, Users, Minus, Save, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFlash } from "@/components/flash-provider";
 
@@ -244,6 +244,30 @@ export default function Home() {
     queryClient.invalidateQueries({ queryKey: getGetSessionQueryKey() });
   };
 
+  // Attendance save state
+  const [attendanceSaved, setAttendanceSaved] = useState(false);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
+
+  const handleSaveAttendance = useCallback(async () => {
+    if (!session?.workplaceId) return;
+    setAttendanceSaving(true);
+    try {
+      const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      await fetch(`${base}/api/session/attendance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          peopleCount,
+          peopleNames: peopleNames.filter(Boolean),
+        }),
+      });
+      setAttendanceSaved(true);
+      setTimeout(() => setAttendanceSaved(false), 3000);
+    } finally {
+      setAttendanceSaving(false);
+    }
+  }, [session?.workplaceId, peopleCount, peopleNames]);
+
   // People tab helpers
   const handlePeopleCount = (delta: number) => {
     const next = Math.max(1, Math.min(20, peopleCount + delta));
@@ -256,6 +280,7 @@ export default function Home() {
   };
 
   const handleNameChange = (i: number, value: string) => {
+    setAttendanceSaved(false);
     setPeopleNames((prev) => {
       const arr = [...prev];
       arr[i] = value;
@@ -275,10 +300,17 @@ export default function Home() {
                 {session?.workplaceName || "Рабочее место не выбрано"}
               </span>
               <span className="text-xs text-muted-foreground leading-none mt-1">
-                {session?.zone ?? ""}
+                {[session?.zone, session?.shiftName].filter(Boolean).join(" · ")}
               </span>
             </div>
           </div>
+          {session?.shift && (
+            <Badge variant="outline" className="gap-1 text-xs">
+              {session.shift === "day"
+                ? <><Sun className="h-3 w-3" /> День</>
+                : <><Moon className="h-3 w-3" /> Ночь</>}
+            </Badge>
+          )}
 
           <Badge variant="outline" className="bg-success/10 text-success border-success/20 py-1 px-3">
             <div className="w-2 h-2 rounded-full bg-success mr-2 animate-pulse" />
@@ -629,6 +661,22 @@ export default function Home() {
                   )}
                 </div>
               )}
+
+              {/* Save button */}
+              <Button
+                className="w-full h-12 text-base font-semibold gap-2"
+                onClick={handleSaveAttendance}
+                disabled={attendanceSaving || attendanceSaved}
+                variant={attendanceSaved ? "outline" : "default"}
+              >
+                {attendanceSaved ? (
+                  <><CheckCircle2 className="h-5 w-5 text-success" /> Явка сохранена</>
+                ) : attendanceSaving ? (
+                  "Сохранение..."
+                ) : (
+                  <><Save className="h-5 w-5" /> Сохранить явку в отчёт</>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </div>

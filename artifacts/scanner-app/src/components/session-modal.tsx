@@ -8,8 +8,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQueryClient } from "@tanstack/react-query";
+import { Sun, Moon } from "lucide-react";
 
 const OKIU_OPTIONS = ["ОКиУ 2", "ОКиУ 3", "ОКиУ 4", "ОКиУ 5", "ОКиУ 6"];
+
+const SHIFTS = [
+  { value: "day" as const, label: "Дневная", hours: "09:00 – 21:00", icon: Sun },
+  { value: "night" as const, label: "Ночная", hours: "21:00 – 09:00", icon: Moon },
+];
 
 export function SessionModal() {
   const queryClient = useQueryClient();
@@ -18,10 +24,12 @@ export function SessionModal() {
   const setSession = useSetSession();
 
   const [okiu, setOkiu] = useState<string>("");
+  const [shift, setShift] = useState<"day" | "night" | "">("");
   const [workplaceId, setWorkplaceId] = useState<string>("none");
 
   useEffect(() => {
     if (session?.zone) setOkiu(session.zone);
+    if (session?.shift) setShift(session.shift);
     if (session?.workplaceId) setWorkplaceId(session.workplaceId.toString());
   }, [session]);
 
@@ -37,10 +45,12 @@ export function SessionModal() {
     ? (workplaces ?? []).filter((wp) => wp.zone === okiu && wp.active !== false)
     : [];
 
+  const canSave = !!okiu && !!shift && workplaceId !== "none";
+
   const handleSave = () => {
-    if (!okiu || workplaceId === "none") return;
+    if (!canSave) return;
     setSession.mutate(
-      { data: { workplaceId: parseInt(workplaceId, 10), zone: okiu } },
+      { data: { workplaceId: parseInt(workplaceId, 10), zone: okiu, shift: shift as "day" | "night" } },
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetSessionQueryKey() }) }
     );
   };
@@ -50,10 +60,35 @@ export function SessionModal() {
       <div className="w-full max-w-md bg-card border border-border shadow-2xl rounded-xl p-8 space-y-6">
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Начало работы</h1>
-          <p className="text-muted-foreground">Выберите вашу зону и рабочий стол</p>
+          <p className="text-muted-foreground">Выберите смену, зону и рабочий стол</p>
         </div>
 
         <div className="space-y-4">
+          {/* Shift selector */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Смена <span className="text-destructive">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {SHIFTS.map(({ value, label, hours, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setShift(value)}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-4 transition-all cursor-pointer ${
+                    shift === value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-muted/30 text-muted-foreground hover:border-border hover:bg-muted/60"
+                  }`}
+                >
+                  <Icon className="h-6 w-6" />
+                  <span className="text-sm font-bold">{label}</span>
+                  <span className="text-xs font-mono opacity-75">{hours}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* ОКиУ selector */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
@@ -103,7 +138,7 @@ export function SessionModal() {
         <Button
           className="w-full h-14 text-lg font-bold uppercase tracking-wider"
           onClick={handleSave}
-          disabled={!okiu || workplaceId === "none" || setSession.isPending}
+          disabled={!canSave || setSession.isPending}
         >
           {setSession.isPending ? "Сохранение..." : "Начать работу"}
         </Button>

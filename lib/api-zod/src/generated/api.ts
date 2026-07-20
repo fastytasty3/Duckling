@@ -801,7 +801,13 @@ export const SetSessionBody = zod.object({
   "operatorId": zod.number().optional(),
   "shiftId": zod.number().optional(),
   "workplaceId": zod.number().optional(),
-  "zone": zod.string().optional()
+  "zone": zod.string().optional(),
+  "shift": zod.enum(["day", "night"]).optional()
+})
+
+export const SaveAttendanceBody = zod.object({
+  "peopleCount": zod.number().int().min(0),
+  "peopleNames": zod.array(zod.string())
 })
 
 export const SetSessionResponse = zod.object({
