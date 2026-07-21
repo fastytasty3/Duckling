@@ -14,6 +14,7 @@ import { logger } from "./lib/logger";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env["NODE_ENV"] === "production";
+const IS_TEST = process.env["NODE_ENV"] === "test";
 
 // ---------------------------------------------------------------------------
 // Allowed origins — comma-separated ALLOWED_ORIGINS env var, or Replit domains
@@ -29,20 +30,22 @@ function buildAllowedOrigins(): (string | RegExp)[] {
 const ALLOWED_ORIGINS = buildAllowedOrigins();
 
 // ---------------------------------------------------------------------------
-// Global rate limiter — 200 req / 15 min per IP
+// Rate limiters
+// In test mode: limits are raised so high that tests never hit them,
+// but headers are still emitted (needed for security-header tests).
 // ---------------------------------------------------------------------------
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 200,
+  limit: IS_TEST ? 100_000 : 200,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Слишком много запросов. Повторите позже." },
 });
 
-// Stricter limit on auth endpoints — 20 req / 15 min per IP
+// Stricter limit on auth endpoints — 20 req / 15 min per IP (prod)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: IS_TEST ? 100_000 : 20,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Слишком много запросов на авторизацию. Повторите позже." },
