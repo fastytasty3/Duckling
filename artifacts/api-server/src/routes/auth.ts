@@ -100,6 +100,10 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   // Set httpOnly cookie — Secure flag on in production
   const maxAge = rememberMe ? 8 * 60 * 60 * 1000 : 30 * 60 * 1000;
   const isSecure = process.env["NODE_ENV"] === "production";
+  // nosemgrep: javascript.express.session-fixation.session-fixation
+  // `token` is a server-generated JWT signed with SESSION_SECRET; `req` is
+  // passed to createSession only for IP/user-agent audit logging, not to
+  // construct the token value — no user-controlled data enters the cookie.
   res.cookie("sv_token", token, { httpOnly: true, sameSite: "strict", maxAge, secure: isSecure });
 
   await logSecurity(String(account.id), login, account.role, "login", "success", "Успешный вход", req);
