@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, gte, isNull, lte, or, ne } from "drizzle-orm";
 import { db, operationsTable, operationPausesTable, securityLogTable, workplacesTable, attendanceLogsTable } from "@workspace/db";
-import { requireAuth } from "../lib/auth";
-import { logSecurity } from "../lib/auth";
+import { requireAuth, logSecurity } from "../lib/auth";
+import { resolveOperationForSupervisor } from "../lib/scope";
 import { getWorkstations } from "../lib/ws-server";
 import { operationToDto, finalizeOperation, getOperationWithPauses } from "../lib/operation-helper";
 
@@ -181,6 +181,12 @@ router.get("/supervisor/workstations", auth, async (req, res): Promise<void> => 
 router.post("/supervisor/operations/:id/force-stop", auth, async (req, res): Promise<void> => {
   const sv = (req as any).supervisor;
   const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Некорректный id" }); return; }
+
+  // Zone-level object check: supervisor may only act on their zone; admin bypasses
+  const allowed = await resolveOperationForSupervisor(id, sv);
+  if (!allowed) { res.status(403).json({ error: "Доступ запрещён: операция не в вашей зоне" }); return; }
+
   const { comment } = req.body ?? {};
 
   await finalizeOperation(id);
@@ -202,6 +208,11 @@ router.post("/supervisor/operations/:id/force-stop", auth, async (req, res): Pro
 router.patch("/supervisor/operations/:id/comment", auth, async (req, res): Promise<void> => {
   const sv = (req as any).supervisor;
   const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Некорректный id" }); return; }
+
+  const allowed = await resolveOperationForSupervisor(id, sv);
+  if (!allowed) { res.status(403).json({ error: "Доступ запрещён: операция не в вашей зоне" }); return; }
+
   const { comment, flag, flagReason } = req.body ?? {};
 
   const updates: Record<string, unknown> = {};

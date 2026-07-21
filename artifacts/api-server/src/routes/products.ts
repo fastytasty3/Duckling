@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, isNull, ilike, or } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { db, productsTable } from "@workspace/db";
 import {
   CreateProductBody,
@@ -11,6 +11,7 @@ import {
   ImportProductsBody,
   ListProductsQueryParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -47,7 +48,7 @@ router.get("/products", async (req, res): Promise<void> => {
   res.json(rows.map(toDto));
 });
 
-router.post("/products", async (req, res): Promise<void> => {
+router.post("/products", requireAuth(["supervisor", "admin"]), async (req, res): Promise<void> => {
   const parsed = CreateProductBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   try {
@@ -71,7 +72,7 @@ router.post("/products", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/products/import", async (req, res): Promise<void> => {
+router.post("/products/import", requireAuth(["supervisor", "admin"]), async (req, res): Promise<void> => {
   const parsed = ImportProductsBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   let created = 0, updated = 0, skipped = 0;
@@ -123,7 +124,7 @@ router.get("/products/:id", async (req, res): Promise<void> => {
   res.json(toDto(row));
 });
 
-router.patch("/products/:id", async (req, res): Promise<void> => {
+router.patch("/products/:id", requireAuth(["supervisor", "admin"]), async (req, res): Promise<void> => {
   const params = UpdateProductParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = UpdateProductBody.safeParse(req.body);
@@ -143,7 +144,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   res.json(toDto(row));
 });
 
-router.delete("/products/:id", async (req, res): Promise<void> => {
+router.delete("/products/:id", requireAuth(["admin"]), async (req, res): Promise<void> => {
   const params = DeleteProductParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   await db.update(productsTable).set({ deletedAt: new Date(), active: false }).where(eq(productsTable.id, params.data.id));

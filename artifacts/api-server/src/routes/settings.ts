@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { UpdateSettingsBody } from "@workspace/api-zod";
 import { getSettingsMap, parseSettings, setSetting } from "../lib/settings-helper";
+import { requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -9,7 +10,7 @@ router.get("/settings", async (_req, res): Promise<void> => {
   res.json(parseSettings(map));
 });
 
-router.patch("/settings", async (req, res): Promise<void> => {
+router.patch("/settings", requireAuth(["admin"]), async (req, res): Promise<void> => {
   const parsed = UpdateSettingsBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const d = parsed.data;

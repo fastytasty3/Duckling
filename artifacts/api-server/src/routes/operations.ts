@@ -19,15 +19,19 @@ import {
   getOperationWithPauses,
   findActiveOperation,
   finalizeOperation,
-  calcPauseDuration,
 } from "../lib/operation-helper";
 import { getSettingsMap, parseSettings } from "../lib/settings-helper";
 import { getSession } from "../lib/session-store";
-// Note: getSession now requires workplaceId — see resolvedWorkplaceId usage below
 import { logAction } from "../lib/action-logger";
+import { requireAuth } from "../lib/auth";
+import { getRequestWorkplaceId, resolveOperationForWorkplace } from "../lib/scope";
 
 const router: IRouter = Router();
 
+// ---------------------------------------------------------------------------
+// List operations
+// Access: open (operators and supervisors both need this)
+// ---------------------------------------------------------------------------
 router.get("/operations", async (req, res): Promise<void> => {
   const params = ListOperationsQueryParams.safeParse(req.query);
   const limit = (params.success && params.data.limit) ? params.data.limit : 50;
@@ -52,7 +56,6 @@ router.get("/operations", async (req, res): Promise<void> => {
     .limit(limit)
     .offset(offset);
 
-  // Count total
   const allRows = await db.select({ id: operationsTable.id })
     .from(operationsTable)
     .where(and(...conditions));
@@ -60,7 +63,8 @@ router.get("/operations", async (req, res): Promise<void> => {
   const ids = rows.map(r => r.id);
   let allPauses: (typeof operationPausesTable.$inferSelect)[] = [];
   if (ids.length > 0) {
-    allPauses = await db.select().from(operationPausesTable).where(inArray(operationPausesTable.operationId, ids));
+    allPauses = await db.select().from(operationPausesTable)
+      .where(inArray(operationPausesTable.operationId, ids));
   }
 
   const items = rows.map(op => {
@@ -71,31 +75,38 @@ router.get("/operations", async (req, res): Promise<void> => {
   res.json({ items, total: allRows.length });
 });
 
+// ---------------------------------------------------------------------------
+// Active operation for this workplace
+// Access: open (operator terminal polls this)
+// ---------------------------------------------------------------------------
 router.get("/operations/active", async (req, res): Promise<void> => {
-  // Isolate by workplaceId so multiple workstations don't interfere
   const headerWpId = req.headers["x-workplace-id"];
   const queryWpId = (req.query as any)?.workplaceId;
   const rawId = headerWpId ?? queryWpId;
   const workplaceId = rawId ? (parseInt(String(rawId), 10) || undefined) : undefined;
 
   const active = await findActiveOperation(workplaceId);
-  if (!active) {
-    res.json({ operation: null });
-    return;
-  }
+  if (!active) { res.json({ operation: null }); return; }
   res.json({ operation: operationToDto(active.op, active.pauses) });
 });
 
+// ---------------------------------------------------------------------------
+// Barcode scan
+// Access: open (operator terminal)
+// ---------------------------------------------------------------------------
 router.post("/operations/scan", async (req, res): Promise<void> => {
   const parsed = ProcessBarcodeScanBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const { barcode } = parsed.data;
-  // Resolve workplaceId: from body > X-Workplace-Id header > session fallback
   const headerWpId = req.headers["x-workplace-id"];
   const resolvedWorkplaceId = parsed.data.workplaceId
     ?? (headerWpId ? parseInt(String(headerWpId), 10) || undefined : undefined);
-  const session = resolvedWorkplaceId ? getSession(resolvedWorkplaceId) : { operatorId: null, operatorName: null, shiftId: null, shiftName: null, workplaceId: null, workplaceName: null, zone: null, shift: null };
+
+  const session = resolvedWorkplaceId
+    ? getSession(resolvedWorkplaceId)
+    : { operatorId: null, operatorName: null, shiftId: null, shiftName: null, workplaceId: null, workplaceName: null, zone: null, shift: null };
+
   const settingsMap = await getSettingsMap();
   const settings = parseSettings(settingsMap);
 
@@ -103,12 +114,10 @@ router.post("/operations/scan", async (req, res): Promise<void> => {
   const shiftId = parsed.data.shiftId ?? session.shiftId ?? undefined;
   const workplaceId = parsed.data.workplaceId ?? session.workplaceId ?? undefined;
 
-  // Look up product
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.barcode, barcode));
+  const [product] = await db.select().from(productsTable)
+    .where(eq(productsTable.barcode, barcode));
 
   const productFound = !!product;
-
-  // Find currently active operation — scoped to this workplaceId
   const currentActive = await findActiveOperation(resolvedWorkplaceId);
 
   let resultStatus: "new_operation" | "quantity_incremented" | "operation_restarted" | "product_unknown";
@@ -120,7 +129,6 @@ router.post("/operations/scan", async (req, res): Promise<void> => {
     const isSameBarcode = currentActive.op.barcode === barcode;
 
     if (isSameBarcode && settings.scanMode === "increment_quantity") {
-      // Increment quantity
       const [updated] = await db.update(operationsTable)
         .set({ quantity: currentActive.op.quantity + 1 })
         .where(eq(operationsTable.id, currentActive.op.id))
@@ -129,13 +137,13 @@ router.post("/operations/scan", async (req, res): Promise<void> => {
       newPauses = currentActive.pauses;
       resultStatus = "quantity_incremented";
     } else {
-      // Finalize current operation
       await finalizeOperation(currentActive.op.id);
-      const [finalized] = await db.select().from(operationsTable).where(eq(operationsTable.id, currentActive.op.id));
-      const finalizedPauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, currentActive.op.id));
+      const [finalized] = await db.select().from(operationsTable)
+        .where(eq(operationsTable.id, currentActive.op.id));
+      const finalizedPauses = await db.select().from(operationPausesTable)
+        .where(eq(operationPausesTable.operationId, currentActive.op.id));
       previousOperation = operationToDto(finalized, finalizedPauses);
 
-      // Create new operation
       const now = new Date();
       const [created] = await db.insert(operationsTable).values({
         barcode,
@@ -159,7 +167,6 @@ router.post("/operations/scan", async (req, res): Promise<void> => {
       resultStatus = isSameBarcode ? "operation_restarted" : (productFound ? "new_operation" : "product_unknown");
     }
   } else {
-    // No active operation — create new one
     const now = new Date();
     const [created] = await db.insert(operationsTable).values({
       barcode,
@@ -193,19 +200,34 @@ router.post("/operations/scan", async (req, res): Promise<void> => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Get operation by id
+// Access: open — but scoped to the requesting workplace if X-Workplace-Id provided
+// ---------------------------------------------------------------------------
 router.get("/operations/:id", async (req, res): Promise<void> => {
   const params = GetOperationParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+
+  const wpId = getRequestWorkplaceId(req);
+  if (wpId !== null) {
+    const scoped = await resolveOperationForWorkplace(params.data.id, wpId);
+    if (!scoped) { res.status(403).json({ error: "Доступ запрещён" }); return; }
+  }
+
   const data = await getOperationWithPauses(params.data.id);
   if (!data) { res.status(404).json({ error: "Операция не найдена" }); return; }
   res.json(operationToDto(data.op, data.pauses));
 });
 
-router.patch("/operations/:id", async (req, res): Promise<void> => {
+// ---------------------------------------------------------------------------
+// Update operation (admin/supervisor only)
+// ---------------------------------------------------------------------------
+router.patch("/operations/:id", requireAuth(["supervisor", "admin"]), async (req, res): Promise<void> => {
   const params = UpdateOperationParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = UpdateOperationBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
   const updates: Record<string, unknown> = {};
   const d = parsed.data;
   if (d.productId !== undefined) updates.productId = d.productId;
@@ -213,70 +235,145 @@ router.patch("/operations/:id", async (req, res): Promise<void> => {
   if (d.startTime !== undefined) updates.startTime = new Date(d.startTime);
   if (d.endTime !== undefined) updates.endTime = new Date(d.endTime);
   if (d.comment !== undefined) updates.comment = d.comment;
-  const [op] = await db.update(operationsTable).set(updates).where(eq(operationsTable.id, params.data.id)).returning();
+
+  const [op] = await db.update(operationsTable)
+    .set(updates)
+    .where(eq(operationsTable.id, params.data.id))
+    .returning();
   if (!op) { res.status(404).json({ error: "Операция не найдена" }); return; }
-  const pauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, op.id));
+
+  const pauses = await db.select().from(operationPausesTable)
+    .where(eq(operationPausesTable.operationId, op.id));
   res.json(operationToDto(op, pauses));
 });
 
-router.delete("/operations/:id", async (req, res): Promise<void> => {
+// ---------------------------------------------------------------------------
+// Delete operation (admin only)
+// ---------------------------------------------------------------------------
+router.delete("/operations/:id", requireAuth(["admin"]), async (req, res): Promise<void> => {
   const params = DeleteOperationParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-  await db.update(operationsTable).set({ deletedAt: new Date() }).where(eq(operationsTable.id, params.data.id));
+  await db.update(operationsTable)
+    .set({ deletedAt: new Date() })
+    .where(eq(operationsTable.id, params.data.id));
   res.json({ ok: true });
 });
 
+// ---------------------------------------------------------------------------
+// Stop operation
+// Access: open — scoped to requesting workplace
+// ---------------------------------------------------------------------------
 router.post("/operations/:id/stop", async (req, res): Promise<void> => {
   const params = StopOperationParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+
+  const wpId = getRequestWorkplaceId(req);
+  if (wpId !== null) {
+    const scoped = await resolveOperationForWorkplace(params.data.id, wpId);
+    if (!scoped) { res.status(403).json({ error: "Доступ запрещён" }); return; }
+  }
+
   await finalizeOperation(params.data.id);
   const data = await getOperationWithPauses(params.data.id);
   if (!data) { res.status(404).json({ error: "Операция не найдена" }); return; }
   res.json(operationToDto(data.op, data.pauses));
 });
 
+// ---------------------------------------------------------------------------
+// Pause operation
+// Access: open — scoped to requesting workplace
+// ---------------------------------------------------------------------------
 router.post("/operations/:id/pause", async (req, res): Promise<void> => {
   const params = PauseOperationParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-  const [op] = await db.select().from(operationsTable).where(eq(operationsTable.id, params.data.id));
-  if (!op || op.status !== "active") { res.status(400).json({ error: "Операция не активна" }); return; }
-  await db.update(operationsTable).set({ status: "paused" }).where(eq(operationsTable.id, op.id));
+
+  const wpId = getRequestWorkplaceId(req);
+  if (wpId !== null) {
+    const scoped = await resolveOperationForWorkplace(params.data.id, wpId);
+    if (!scoped) { res.status(403).json({ error: "Доступ запрещён" }); return; }
+  }
+
+  const [op] = await db.select().from(operationsTable)
+    .where(eq(operationsTable.id, params.data.id));
+  if (!op || op.status !== "active") {
+    res.status(400).json({ error: "Операция не активна" }); return;
+  }
+  await db.update(operationsTable).set({ status: "paused" })
+    .where(eq(operationsTable.id, op.id));
   await db.insert(operationPausesTable).values({ operationId: op.id, startTime: new Date() });
+
   const data = await getOperationWithPauses(params.data.id);
   if (!data) { res.status(404).json({ error: "Операция не найдена" }); return; }
   res.json(operationToDto(data.op, data.pauses));
 });
 
+// ---------------------------------------------------------------------------
+// Resume operation
+// Access: open — scoped to requesting workplace
+// ---------------------------------------------------------------------------
 router.post("/operations/:id/resume", async (req, res): Promise<void> => {
   const params = ResumeOperationParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-  const [op] = await db.select().from(operationsTable).where(eq(operationsTable.id, params.data.id));
-  if (!op || op.status !== "paused") { res.status(400).json({ error: "Операция не на паузе" }); return; }
-  // Close open pause
-  const pauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, op.id));
+
+  const wpId = getRequestWorkplaceId(req);
+  if (wpId !== null) {
+    const scoped = await resolveOperationForWorkplace(params.data.id, wpId);
+    if (!scoped) { res.status(403).json({ error: "Доступ запрещён" }); return; }
+  }
+
+  const [op] = await db.select().from(operationsTable)
+    .where(eq(operationsTable.id, params.data.id));
+  if (!op || op.status !== "paused") {
+    res.status(400).json({ error: "Операция не на паузе" }); return;
+  }
+
+  const pauses = await db.select().from(operationPausesTable)
+    .where(eq(operationPausesTable.operationId, op.id));
   const openPause = pauses.find(p => !p.endTime);
   if (openPause) {
-    await db.update(operationPausesTable).set({ endTime: new Date() }).where(eq(operationPausesTable.id, openPause.id));
+    await db.update(operationPausesTable)
+      .set({ endTime: new Date() })
+      .where(eq(operationPausesTable.id, openPause.id));
   }
-  await db.update(operationsTable).set({ status: "active" }).where(eq(operationsTable.id, op.id));
+  await db.update(operationsTable).set({ status: "active" })
+    .where(eq(operationsTable.id, op.id));
+
   const data = await getOperationWithPauses(params.data.id);
   if (!data) { res.status(404).json({ error: "Операция не найдена" }); return; }
   res.json(operationToDto(data.op, data.pauses));
 });
 
+// ---------------------------------------------------------------------------
+// Update quantity
+// Access: open — scoped to requesting workplace
+// ---------------------------------------------------------------------------
 router.patch("/operations/:id/quantity", async (req, res): Promise<void> => {
   const params = UpdateOperationQuantityParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = UpdateOperationQuantityBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  const [op] = await db.select().from(operationsTable).where(eq(operationsTable.id, params.data.id));
+
+  const wpId = getRequestWorkplaceId(req);
+  if (wpId !== null) {
+    const scoped = await resolveOperationForWorkplace(params.data.id, wpId);
+    if (!scoped) { res.status(403).json({ error: "Доступ запрещён" }); return; }
+  }
+
+  const [op] = await db.select().from(operationsTable)
+    .where(eq(operationsTable.id, params.data.id));
   if (!op) { res.status(404).json({ error: "Операция не найдена" }); return; }
+
   const newQty = parsed.data.quantity !== undefined
     ? parsed.data.quantity
     : Math.max(1, op.quantity + (parsed.data.delta ?? 1));
-  const [updated] = await db.update(operationsTable).set({ quantity: newQty }).where(eq(operationsTable.id, op.id)).returning();
-  const pauses = await db.select().from(operationPausesTable).where(eq(operationPausesTable.operationId, op.id));
-  res.json(operationToDto(updated, pauses));
+
+  const [updated] = await db.update(operationsTable)
+    .set({ quantity: newQty })
+    .where(eq(operationsTable.id, op.id))
+    .returning();
+  const opPauses = await db.select().from(operationPausesTable)
+    .where(eq(operationPausesTable.operationId, op.id));
+  res.json(operationToDto(updated, opPauses));
 });
 
 export default router;
