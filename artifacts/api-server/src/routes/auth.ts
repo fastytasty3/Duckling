@@ -97,9 +97,10 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   const token = await createSession(account.id, account.login, account.role, req, !!rememberMe);
 
-  // Set httpOnly cookie
+  // Set httpOnly cookie — Secure flag on in production
   const maxAge = rememberMe ? 8 * 60 * 60 * 1000 : 30 * 60 * 1000;
-  res.cookie("sv_token", token, { httpOnly: true, sameSite: "strict", maxAge });
+  const isSecure = process.env["NODE_ENV"] === "production";
+  res.cookie("sv_token", token, { httpOnly: true, sameSite: "strict", maxAge, secure: isSecure });
 
   await logSecurity(String(account.id), login, account.role, "login", "success", "Успешный вход", req);
 
