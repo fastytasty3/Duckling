@@ -6,3 +6,9 @@ id = "ku2zg8qk_DswEDvIfB5Ky"
 uri = "file://warehouse-scanner-src.zip"
 type = "unspecified"
 title = "warehouse-scanner-src.zip"
+
+[[outputs]]
+id = "TEX9TSlB6I3p_JMd_ZAVe"
+uri = "file://scanner-project.zip"
+type = "unspecified"
+title = "scanner-project.zip"
